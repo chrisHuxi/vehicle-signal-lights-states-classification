@@ -20,7 +20,7 @@ class MyResnet50(models.resnet.ResNet):
     def __init__(self, pretrained=False):
         # Pass default resnet50 arguments to super init
         # https://github.com/pytorch/vision/blob/e130c6cca88160b6bf7fea9b8bc251601a1a75c5/torchvision/models/resnet.py#L260
-        super(MyResnet50, self).__init__(models.resnet.Bottleneck, [3, 4, 6, 3])
+        super().__init__(models.resnet.Bottleneck, [3, 4, 6, 3])
         if pretrained:
             self.load_state_dict(models.resnet50(pretrained=True).state_dict())
 
@@ -53,9 +53,9 @@ output = model(x)
 
 #https://discuss.pytorch.org/t/solved-concatenate-time-distributed-cnn-with-lstm/15435/4
 # https://blog.csdn.net/shanglianlm/article/details/86376627 resnet 用法
-class CLSTM(nn.Module):
-    def __init__(self, lstm_hidden_dim, lstm_num_layers, class_num):
-        super(CLSTM, self).__init__()
+class CLSTM(models.resnet.ResNet):
+    def __init__(self, lstm_hidden_dim, lstm_num_layers, class_num, pretrained=True):
+        super().__init__(models.resnet.Bottleneck, [3, 4, 6, 3])
         self.hidden_dim = lstm_hidden_dim
         self.num_layers = lstm_num_layers
         self.image_width = 224
@@ -63,7 +63,7 @@ class CLSTM(nn.Module):
         self.class_num = class_num
         
         _dropout = 0.7
-        super(MyResnet50, self).__init__(models.resnet.Bottleneck, [3, 4, 6, 3])
+        
         if pretrained:
             self.load_state_dict(models.resnet50(pretrained=True).state_dict())
         
@@ -72,9 +72,9 @@ class CLSTM(nn.Module):
         
         # linear
         self.hidden1_fc = nn.Linear(self.hidden_dim, self.hidden_dim // 2)
-        self.hidden2_fc = nn.Linear(self.hidden_dim // 2, C)
+        self.hidden2_fc = nn.Linear(self.hidden_dim // 2, self.class_num)
         # dropout
-        self.dropout = nn.Dropout(dropout=_dropout)
+        self.dropout = nn.Dropout(p=_dropout)
         
     def forward(self, x):
         # size: batch, len, channel, width, height
@@ -102,15 +102,15 @@ class CLSTM(nn.Module):
         lstm_out = torch.transpose(lstm_out, 1, 2)
         lstm_out = F.max_pool1d(lstm_out, lstm_out.size(2)).squeeze(2)
         # linear
-        cnn_lstm_out = self.hidden1_fc(F.tanh(lstm_out))
-        cnn_lstm_out = self.hidden2_fc(F.tanh(cnn_lstm_out))
+        cnn_lstm_out = self.hidden1_fc(torch.tanh(lstm_out))
+        cnn_lstm_out = self.hidden2_fc(torch.tanh(cnn_lstm_out))
         # output
         logit = cnn_lstm_out
 
         return logit       
         
 def test_model():
-    model = CLSTM(lstm_hidden_dim = 10, lstm_num_layers = 1, class_num=8)
+    model = CLSTM(lstm_hidden_dim = 10, lstm_num_layers = 2, class_num=8)
     #batch, len, channel, width, height
     data = torch.randn(1, 10, 3, 224, 224)
     output = model(data)
@@ -140,3 +140,6 @@ def train(epoch):
                 epoch, batch_idx * len(data), len(train_loader.dataset),
                 100. * batch_idx / len(train_loader), loss.data[0])) 
 '''
+
+if __name__=='__main__':
+    test_model()
