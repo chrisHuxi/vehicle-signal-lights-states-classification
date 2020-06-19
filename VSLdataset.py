@@ -92,7 +92,7 @@ class VSLDataSet(Dataset):
     def __getitem__(self, index):
         start = index
         end = index + self.seq_length
-        print('Getting images from {} to {}'.format(start, end))
+        #print('Getting images from {} to {}'.format(start, end))
         indices = list(range(start, end))
         images = []
         for i in indices:
@@ -109,21 +109,8 @@ class VSLDataSet(Dataset):
     def __len__(self):
         return self.length
 
+def load_dataset(root_dir, class_name_to_id, aug_transform):
 
-    
-if __name__ == '__main__':
-    root_dir = './dataset/train/'
-    class_name_to_id = {
-    'OOO':0,
-    'BOO':1,
-    'OLO':2,
-    'BLO':3,
-    'OOR':4,
-    'BOR':5,
-    'OLR':6,
-    'BLR':7
-    }
-    #class_paths = class_name_to_id_.keys()
     class_image_paths = []
     end_idx = []
 
@@ -137,31 +124,111 @@ if __name__ == '__main__':
                 paths = [(p, class_idx) for p in paths]
                 class_image_paths.extend(paths)
                 end_idx.extend([len(paths)])
-    print(end_idx)
+
     end_idx = [0, *end_idx]
     
     end_idx = torch.cumsum(torch.tensor(end_idx), 0)
-    print(end_idx)
     seq_length = 10
 
     sampler = FramesSampler(end_idx, seq_length)
-    transform = transforms.Compose([
-        transforms.Resize((256, 256)),
-        transforms.ToTensor()
-    ])
+
 
     dataset = VSLDataSet(
         image_paths=class_image_paths,
         seq_length=seq_length,
-        transform=transform,
+        transform=aug_transform,
         length=len(sampler))
 
-    loader = DataLoader(
-        dataset,
-        batch_size=3,
-        sampler=sampler
-    )
+    return dataset, sampler
 
-    for data, target in loader:
-        print(data.shape)
-        print(target.shape)
+def create_dataloader_train_valid_test(train_batch_size=32, valid_batch_size=16, test_batch_size=16):
+    train_transform = transforms.Compose([
+        transforms.Resize((224, 224)),
+        transforms.ToTensor(),
+        transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
+    ])
+    train_dataset, train_sampler = load_dataset(root_dir = '../dataset/train/', class_name_to_id = class_name_to_id_, aug_transform = train_transform)
+    
+    valid_transform = transforms.Compose([
+        transforms.Resize((224, 224)),
+        transforms.ToTensor(),
+        transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
+    ])
+    valid_dataset, valid_sampler = load_dataset(root_dir = '../dataset/valid/', class_name_to_id = class_name_to_id_, aug_transform = valid_transform)
+    
+    test_transform = transforms.Compose([
+        transforms.Resize((224, 224)),
+        transforms.ToTensor(),
+        transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
+    ])
+    test_dataset, test_sampler = load_dataset(root_dir = '../dataset/test/', class_name_to_id = class_name_to_id_, aug_transform = test_transform)
+    
+    
+    train_data_loader = DataLoader(
+        train_dataset,
+        batch_size=train_batch_size,
+        sampler=train_sampler
+    )
+    valid_data_loader = DataLoader(
+        valid_dataset,
+        batch_size=valid_batch_size,
+        sampler=valid_sampler
+    )
+    
+    test_data_loader = DataLoader(
+        test_dataset,
+        batch_size=test_batch_size,
+        sampler=test_sampler
+    )        
+    
+    dataloaders = {
+    'train': train_data_loader,
+    'valid': valid_data_loader,
+    'test': test_data_loader,
+    }
+    return dataloaders
+if __name__ == '__main__':
+
+    dataloaders = create_dataloader_train_valid_test()
+    train_dataloader = dataloaders['train']
+    valid_dataloader = dataloaders['valid']
+    test_dataloader = dataloaders['test']
+    
+    num_epochs = 3
+    valid_epoch_step = 2
+    test_epoch_step = 2
+    for epoch in range(num_epochs):
+        # training
+        # model.train()
+        train_losses = []
+        print('Train:')
+        for index, (data, target) in enumerate(train_dataloader):
+
+            print('Epoch: ', epoch, '| Batch_index: ', index, '| data: ',data.shape, '| labels: ', target.shape)
+            #loss = self._train_step(epoch, index, batch)
+            #losses.append(loss)
+
+        # validation
+        # model.eval()
+        
+        if (epoch%valid_epoch_step == 0):
+            valid_losses = []
+            print('Valid:')
+            for index, batch in enumerate(valid_dataloader):
+                
+                print('Epoch: ', epoch, '| Batch_index: ', index, '| data: ',data.shape, '| labels: ', target.shape)
+                #loss = self._val_step(epoch, index, batch)
+                #losses.append(loss)
+                
+        # validation
+        # model.eval()
+        if (epoch%test_epoch_step == 0):
+            valid_losses = []
+            print('Test:')
+            for index, batch in enumerate(test_dataloader):
+                
+                print('Epoch: ', epoch, '| Batch_index: ', index, '| data: ',data.shape, '| labels: ', target.shape)
+                #loss = self._val_step(epoch, index, batch)
+                #losses.append(loss)
+        
+    

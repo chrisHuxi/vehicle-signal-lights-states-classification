@@ -6,52 +6,19 @@
 
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
-from torch.autograd import Variable
 import numpy as np
 import torchvision.models as models
+
+import VSLdataset
+import torch.optim as optim
 
 """
     Neural Network: CNN_LSTM
     Detail: the input crosss cnn model and LSTM model independly, then the result of both concat
 """
 
-class MyResnet50(models.resnet.ResNet):
-    def __init__(self, pretrained=False):
-        # Pass default resnet50 arguments to super init
-        # https://github.com/pytorch/vision/blob/e130c6cca88160b6bf7fea9b8bc251601a1a75c5/torchvision/models/resnet.py#L260
-        super().__init__(models.resnet.Bottleneck, [3, 4, 6, 3])
-        if pretrained:
-            self.load_state_dict(models.resnet50(pretrained=True).state_dict())
 
-        
-    def _forward_impl(self, x):
-        x = self.conv1(x)
-        x = self.bn1(x)
-        x = self.relu(x)
-        x = self.maxpool(x)
-
-        x = self.layer1(x)
-        x = self.layer2(x)
-        x = self.layer3(x)
-        x = self.layer4(x)
-
-        x = self.avgpool(x)
-        x = torch.flatten(x, 1)
-        x = self.fc(x)
-
-        return x
-
-    def forward(self, x):
-        return self._forward_impl(x)
-
-'''
-model = MyResnet50(pretrained=True)
-x = torch.randn(2, 3, 224, 224)
-output = model(x)
-'''
-
-#https://discuss.pytorch.org/t/solved-concatenate-time-distributed-cnn-with-lstm/15435/4
+# https://discuss.pytorch.org/t/solved-concatenate-time-distributed-cnn-with-lstm/15435/4
 # https://blog.csdn.net/shanglianlm/article/details/86376627 resnet 用法
 class CLSTM(models.resnet.ResNet):
     def __init__(self, lstm_hidden_dim, lstm_num_layers, class_num, pretrained=True):
@@ -108,38 +75,87 @@ class CLSTM(models.resnet.ResNet):
         logit = cnn_lstm_out
 
         return logit       
-        
+
+# 测试一下输出的size        
 def test_model():
     model = CLSTM(lstm_hidden_dim = 10, lstm_num_layers = 2, class_num=8)
     #batch, len, channel, width, height
     data = torch.randn(1, 10, 3, 224, 224)
     output = model(data)
-    print(output)
-    
-def train():
-    pass
-'''
-def train(epoch):
-    model.train()
-    for batch_idx, (data, target) in enumerate(train_loader):
-        
-        data = np.expand_dims(data, axis=1)
-        data = torch.FloatTensor(data)
-        if args.cuda:
-            data, target = data.cuda(), target.cuda()
+    print(output,shape)
 
-        data, target = Variable(data), Variable(target)
-        optimizer.zero_grad()
-        output = model(data)
-        
-        loss = F.nll_loss(output, target)
-        loss.backward()
-        optimizer.step()
-        if batch_idx % args.log_interval == 0:
-            print('Train Epoch: {} [{}/{} ({:.0f}%)]\tLoss: {:.6f}'.format(
-                epoch, batch_idx * len(data), len(train_loader.dataset),
-                100. * batch_idx / len(train_loader), loss.data[0])) 
-'''
+    
+    
+def train(model, num_epochs = 3):
+    # === dataloader defination ===
+    train_batch_size=32, valid_batch_size=16, test_batch_size=16
+    dataloaders = VSLdataset.create_dataloader_train_valid_test(train_batch_size, valid_batch_size, test_batch_size)
+    train_dataloader = dataloaders['train']
+    valid_dataloader = dataloaders['valid']
+    test_dataloader = dataloaders['test']
+    # =============================
+    
+    # === every n epochs print ===
+    valid_epoch_step = 10
+    test_epoch_step = 10
+    # ============================
+    
+    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+    model.to(device)
+    
+    loss_function = nn.CrossEntropyLoss()
+    optimizer = optim.Adam(model.parameters(), lr=0.001)
+
+    for epoch in range(num_epochs):
+        # training
+        model.train()
+        train_loss  = 0.0
+        print('Train:')
+        for index, (data, target) in enumerate(train_dataloader):
+            #print('Epoch: ', epoch, '| Batch_index: ', index, '| data: ',data.shape, '| labels: ', target.shape)
+            data, target = data.to(device), target.to(device)
+            optimizer.zero_grad()
+            output = model(data)
+            loss = loss_function(output, target)
+            loss.backward()
+            optimizer.step()
+            train_loss += loss.item()
+            if index % 10  == 9:    # print every 10 mini-batches
+                print('[%d, %5d] loss: %.3f' %
+                      (epoch + 1, index + 1, train_loss / 10))
+                train_loss = 0.0
+        # validation
+        model.eval()
+        if (epoch % valid_epoch_step == (valid_epoch_step -1)):
+            print('Valid:')
+            for index, (data, target) in enumerate(valid_dataloader):
+                #print('Epoch: ', epoch, '| Batch_index: ', index, '| data: ',data.shape, '| labels: ', target.shape)
+                data, target = data.to(device), target.to(device)
+                output = model(data)
+                _, predicted = torch.max(output, 1)
+                c = (predicted == target).squeeze()
+                for i in range(valid_batch_size):
+                    label = target[i]
+                    class_correct[label] += c[i].item()
+                    class_total[label] += 1
+            for i in range(len(VSLdataset.class_name_to_id_)):
+                print('Accuracy of %5s : %2d %%' % (
+                    classes[i], 100 * class_correct[i] / class_total[i]))
+                
+        # test
+        '''
+        model.eval()
+        if (epoch%test_epoch_step == 0):
+            valid_losses = []
+            print('Test:')
+            for index, batch in enumerate(test_dataloader):
+                
+                print('Epoch: ', epoch, '| Batch_index: ', index, '| data: ',data.shape, '| labels: ', target.shape)
+                #loss = self._val_step(epoch, index, batch)
+                #losses.append(loss)
+        '''
 
 if __name__=='__main__':
-    test_model()
+    #test_model()
+    model = CLSTM()
+    train(model, 100)
