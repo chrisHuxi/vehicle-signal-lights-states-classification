@@ -105,7 +105,9 @@ def train(model, num_epochs = 3):
     
     loss_function = nn.CrossEntropyLoss()
     optimizer = optim.Adam(model.parameters(), lr=0.001)
-
+    
+    save_file = 'saved_model/CLSTM.pth'
+    
     for epoch in range(num_epochs):
         # training
         model.train()
@@ -124,9 +126,10 @@ def train(model, num_epochs = 3):
                 print('[%d, %5d] loss: %.3f' %
                       (epoch + 1, index + 1, train_loss / 10))
                 train_loss = 0.0
-        # validation
-        model.eval()
+
         if (epoch % valid_epoch_step == (valid_epoch_step -1)):
+            # validation
+            model.eval()
             print('Valid:')
             for index, (data, target) in enumerate(valid_dataloader):
                 #print('Epoch: ', epoch, '| Batch_index: ', index, '| data: ',data.shape, '| labels: ', target.shape)
@@ -141,7 +144,16 @@ def train(model, num_epochs = 3):
             for i in range(len(VSLdataset.class_name_to_id_)):
                 print('Accuracy of %5s : %2d %%' % (
                     classes[i], 100 * class_correct[i] / class_total[i]))
-                
+            
+            # 每次 eval 都进行保存
+            # save current model
+            torch.save({
+                'model_state_dict': self.model.state_dict(),
+                'epoch': epoch,
+                'optimizer_state_dict': optimizer.state_dict(),
+                'loss': train_loss
+            }, save_file)
+            print("saved model.")
         # test
         '''
         model.eval()
