@@ -1,8 +1,8 @@
-# @Author : bamtercelboo
-# @Datetime : 2018/07/19 22:35
-# @File : model_CNN_LSTM.py
-# @Last Modify Time : 2018/07/19 22:35
-# @Contact : bamtercelboo@{gmail.com, 163.com}
+# @Author : Xi Hu
+# @Datetime : 2020/06/20 21:33
+# @File : CNN_LSTM_model.py
+# @Last Modify Time : 2020/06/20 21:33
+# @Contact : chris_huxi@163.com
 
 import torch
 import torch.nn as nn
@@ -13,15 +13,19 @@ import torchvision.models as models
 
 import sys
 sys.path.append('../')
+
 import os
 import dataloader.VSLdataset as VSLdataset
 import torch.optim as optim
+
+
+
+from torch.utils.tensorboard import SummaryWriter    
 
 """
     Neural Network: CNN_LSTM
     Detail: the input crosss cnn model and LSTM model independly, then the result of both concat
 """
-
 
 # https://discuss.pytorch.org/t/solved-concatenate-time-distributed-cnn-with-lstm/15435/4
 # https://blog.csdn.net/shanglianlm/article/details/86376627 resnet 用法
@@ -112,10 +116,11 @@ def train(model, num_epochs = 3):
     model.to(device)
     
     loss_function = nn.CrossEntropyLoss()
-    optimizer = optim.Adam(model.parameters(), lr=0.001)
+    optimizer = optim.Adam(model.parameters(), lr=0.0001)
     
 
     save_file = os.path.join('../saved_model', 'CLSTM.pth')
+    writer = SummaryWriter('../saved_model/tensorboard_log')
     for epoch in range(num_epochs):
         # training
         model.train()
@@ -123,7 +128,7 @@ def train(model, num_epochs = 3):
         print('Train:')
         for index, (data, target) in enumerate(train_dataloader):
             #print('Epoch: ', epoch, '| Batch_index: ', index, '| data: ',data.shape, '| labels: ', target.shape)
-            '''
+            
             data, target = data.to(device), target.to(device)
             optimizer.zero_grad()
             output = model(data)
@@ -135,7 +140,10 @@ def train(model, num_epochs = 3):
                 print('[%d, %5d] loss: %.3f' %
                       (epoch + 1, index + 1, train_loss / 10))
                 train_loss = 0.0
-            '''
+                writer.add_scalar('Train/Loss', train_loss, epoch)
+                writer.flush()
+                
+                    
 
         if (epoch % valid_epoch_step == (valid_epoch_step -1)):
             # validation
@@ -162,9 +170,12 @@ def train(model, num_epochs = 3):
                         class_correct[label] += c.item()
                     class_total[label] += 1
             for i in range(len(VSLdataset.class_name_to_id_)):
+                accuracy = 100 * (class_correct[i] + 1) / (class_total[i] + 1)
                 print('Accuracy of %5s : %2d %%' % (
-                    class_name[i], 100 * (class_correct[i] + 1) / (class_total[i] + 1)))
-            
+                    class_name[i], accuracy))
+                # Record loss and accuracy from the test run into the writer
+                writer.add_scalar('Test/Accuracy' + str(class_name[i]), accuracy, epoch)
+                writer.flush()
             # 每次 eval 都进行保存
             # save current model
             torch.save({
@@ -174,7 +185,7 @@ def train(model, num_epochs = 3):
                 'loss': train_loss
             }, save_file)
             print("saved model.")
-        # test
+        # test ==> TODO
         '''
         model.eval()
         if (epoch%test_epoch_step == 0):
@@ -189,5 +200,5 @@ def train(model, num_epochs = 3):
 
 if __name__=='__main__':
     #test_model()
-    model = CLSTM(lstm_hidden_dim = 10, lstm_num_layers = 2, class_num=8)
+    model = CLSTM(lstm_hidden_dim = 128, lstm_num_layers = 2, class_num=8)
     train(model, 100)
