@@ -102,8 +102,8 @@ class VSLDataSet(Dataset):
                 image = self.transform(image)
             images.append(image)
         x = torch.stack(images)
-        y = torch.tensor([self.image_paths[start][1]], dtype=torch.long)
-        
+        y = torch.tensor(self.image_paths[start][1], dtype=torch.long)
+
         return x, y
     
     def __len__(self):
@@ -147,21 +147,21 @@ def create_dataloader_train_valid_test(train_batch_size=32, valid_batch_size=16,
         transforms.ToTensor(),
         transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
     ])
-    train_dataset, train_sampler = load_dataset(root_dir = '../dataset/train/', class_name_to_id = class_name_to_id_, aug_transform = train_transform)
+    train_dataset, train_sampler = load_dataset(root_dir = '../../dataset/train/', class_name_to_id = class_name_to_id_, aug_transform = train_transform)
     
     valid_transform = transforms.Compose([
         transforms.Resize((224, 224)),
         transforms.ToTensor(),
         transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
     ])
-    valid_dataset, valid_sampler = load_dataset(root_dir = '../dataset/valid/', class_name_to_id = class_name_to_id_, aug_transform = valid_transform)
+    valid_dataset, valid_sampler = load_dataset(root_dir = '../../dataset/valid/', class_name_to_id = class_name_to_id_, aug_transform = valid_transform)
     
     test_transform = transforms.Compose([
         transforms.Resize((224, 224)),
         transforms.ToTensor(),
         transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
     ])
-    test_dataset, test_sampler = load_dataset(root_dir = '../dataset/test/', class_name_to_id = class_name_to_id_, aug_transform = test_transform)
+    test_dataset, test_sampler = load_dataset(root_dir = '../../dataset/test/', class_name_to_id = class_name_to_id_, aug_transform = test_transform)
     
     
     train_data_loader = DataLoader(
