@@ -99,7 +99,7 @@ def test_model():
 def train(model, num_epochs = 3):
     # === dataloader defination ===
     train_batch_size = 4
-    valid_batch_size = 2
+    valid_batch_size = 1
     test_batch_size = 1
     dataloaders = VSLdataset.create_dataloader_train_valid_test(train_batch_size, valid_batch_size, test_batch_size)
     train_dataloader = dataloaders['train']
