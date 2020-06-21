@@ -94,9 +94,14 @@ def test_model():
     output = model(data)
     print(output,shape)
 
+def load_checkpoint(model, checkpoint_PATH):
+    if checkpoint_PATH != None:
+        model_CKPT = torch.load(checkpoint_PATH)
+        model.load_state_dict(model_CKPT['model_state_dict'])
+        print('loading checkpoint!')
+    return model   
     
-    
-def train(model, num_epochs = 3):
+def train(model_in, num_epochs = 3, load_model = True):
     # === dataloader defination ===
     train_batch_size = 4
     valid_batch_size = 1
@@ -111,17 +116,24 @@ def train(model, num_epochs = 3):
     valid_epoch_step = 1
     test_epoch_step = 10
     # ============================
+
+
+    save_file = os.path.join('../saved_model', 'CLSTM.pth')
+    writer = SummaryWriter('../saved_model/tensorboard_log')
+
+    if(load_model == True):
+        model = load_checkpoint(model_in, save_file)
+    else:
+        model = model_in
+    optimizer = optim.Adam(model.parameters(), lr=0.00001)
+    loss_function = nn.CrossEntropyLoss()
+    scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'min',verbose=1,patience=2)
+
     # === runing no gpu ===
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     model.to(device)
     # =====================
-    
-    loss_function = nn.CrossEntropyLoss()
-    optimizer = optim.Adam(model.parameters(), lr=0.00001)
-    scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'min',verbose=1,patience=2)
 
-    save_file = os.path.join('../saved_model', 'CLSTM.pth')
-    writer = SummaryWriter('../saved_model/tensorboard_log')
     for epoch in range(num_epochs):
         # training
         model.train()
@@ -141,11 +153,9 @@ def train(model, num_epochs = 3):
             if index % 10  == 9:    # print every 10 mini-batches
                 print('[%d, %5d] loss: %.3f' %
                       (epoch + 1, index + 1, train_loss / 10))
-                train_loss = 0.0
-                writer.add_scalar('Train/Loss', train_loss, epoch)
+                writer.add_scalar('Train/Loss', train_loss / 10, index + 1)
                 writer.flush()
-    
-                    
+                train_loss = 0.0
 
         if (epoch % valid_epoch_step == (valid_epoch_step -1)):
             # validation
@@ -154,10 +164,15 @@ def train(model, num_epochs = 3):
             class_name = list(VSLdataset.class_name_to_id_.keys())
             model.eval()
             print('Valid:')
+            loss_eval = 0.0
+            loss_for_display = 0.0
             for index_eval, (data_eval, target_eval) in enumerate(valid_dataloader):
                 data_eval, target_eval = data_eval.to(device), target_eval.to(device)
                 output_eval = model(data_eval)
-                loss_eval = loss_function(output_eval, target_eval)
+                loss_i = loss_function(output_eval, target_eval).item()
+                loss_for_display += loss_i
+                loss_eval += loss_i
+                
                 _, predicted = torch.max(output_eval, 1)
 
                 c = (predicted == target_eval).squeeze()
@@ -169,6 +184,13 @@ def train(model, num_epochs = 3):
                         label = target_eval
                         class_correct[label] += c.item()
                     class_total[label] += 1
+                if index_eval % 10  == 9:    # print every 10 mini-batches
+                    print('[%d, %5d] loss: %.3f' %
+                          (epoch + 1, index_eval + 1, loss_for_display / 10))
+                    writer.add_scalar('Valid/Loss ', loss_for_display / 10), index_eval + 1)
+                    writer.flush()
+                    loss_for_display = 0.0
+
             for i in range(len(VSLdataset.class_name_to_id_)):
                 accuracy = 100 * (class_correct[i] + 1) / (class_total[i] + 1)
                 print('Accuracy of %5s : %2d %%' % (
@@ -177,9 +199,8 @@ def train(model, num_epochs = 3):
                 writer.add_scalar('Valid/Accuracy ' + str(class_name[i]), accuracy, epoch)
                 writer.flush()
 
-            writer.add_scalar('Valid/Loss ', loss_eval, epoch)
-            writer.flush()
-            scheduler.step(loss_eval)
+            scheduler.step(loss_eval/len(valid_dataloader))
+            loss_eval = 0.0
 
             # 每次 eval 都进行保存
             # save current model
@@ -205,5 +226,5 @@ def train(model, num_epochs = 3):
 
 if __name__=='__main__':
     #test_model()
-    model = CLSTM(lstm_hidden_dim = 128, lstm_num_layers = 2, class_num=8)
-    train(model, 100)
+    model = CLSTM(lstm_hidden_dim = 128, lstm_num_layers = 2, class_num=8)        
+    train(model, 100, True)
