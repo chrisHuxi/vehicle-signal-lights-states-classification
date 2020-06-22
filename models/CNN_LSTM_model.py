@@ -153,7 +153,7 @@ def train(model_in, num_epochs = 3, load_model = True):
             if index % 10  == 9:    # print every 10 mini-batches
                 print('[%d, %5d] loss: %.3f' %
                       (epoch + 1, index + 1, train_loss / 10))
-                writer.add_scalar('Train/Loss', train_loss / 10, index + 1)
+                writer.add_scalar('Train/Loss', train_loss / 10, epoch * (len(train_dataloader)) + index + 1)
                 writer.flush()
                 train_loss = 0.0
 
@@ -187,7 +187,7 @@ def train(model_in, num_epochs = 3, load_model = True):
                 if index_eval % 10  == 9:    # print every 10 mini-batches
                     print('[%d, %5d] loss: %.3f' %
                           (epoch + 1, index_eval + 1, loss_for_display / 10))
-                    writer.add_scalar('Valid/Loss ', loss_for_display / 10), index_eval + 1)
+                    writer.add_scalar('Valid/Loss ', loss_for_display / 10, epoch*(len(valid_dataloader)) + index_eval + 1)
                     writer.flush()
                     loss_for_display = 0.0
 
