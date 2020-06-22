@@ -17,8 +17,8 @@ sys.path.append('../')
 import os
 import dataloader.VSLdataset as VSLdataset
 import torch.optim as optim
-
-
+    
+import matplotlib.pyplot as plt
 
 from torch.utils.tensorboard import SummaryWriter    
 
@@ -57,6 +57,25 @@ class CLSTM(models.resnet.ResNet):
         batch_size, timesteps, C, H, W = x.size()
 
         c_in = x.view(batch_size * timesteps, C, H, W)
+        c_display = c_in.view(timesteps, batch_size, -1)
+        
+        fig=plt.figure(figsize=(12, 6))
+            
+        fig.add_subplot(2,2,1)
+        plt.imshow(c_display[0,0,:])
+            
+        fig.add_subplot(2,2,2)
+        plt.imshow(c_display[1,0,:])
+        
+        fig.add_subplot(2,2,1)
+        plt.imshow(c_display[0,1,:])
+            
+        fig.add_subplot(2,2,2)
+        plt.imshow(c_display[1,1,:])
+        
+        plt.show()
+        
+        
         # ResNet:
         cnn_x = self.conv1(c_in)
         cnn_x = self.bn1(cnn_x)
@@ -67,7 +86,7 @@ class CLSTM(models.resnet.ResNet):
         cnn_x = self.layer2(cnn_x)
         cnn_x = self.layer3(cnn_x)
         cnn_x = self.layer4(cnn_x)
-
+        
         cnn_x = self.avgpool(cnn_x)
         c_out = torch.flatten(cnn_x, 1) # batch*len, 2048
 
@@ -134,6 +153,7 @@ def train(model_in, num_epochs = 3, load_model = True):
     model.to(device)
     # =====================
 
+    
     for epoch in range(num_epochs):
         # training
         model.train()
@@ -142,7 +162,75 @@ def train(model_in, num_epochs = 3, load_model = True):
 
         for index, (data, target) in enumerate(train_dataloader):
             #print('Epoch: ', epoch, '| Batch_index: ', index, '| data: ',data.shape, '| labels: ', target.shape)
+            print(target[0])
             
+            print(target[1])
+            
+            fig=plt.figure(figsize=(12, 6))
+            
+            fig.add_subplot(4,5,1)
+            plt.imshow(data[0,0,:])
+            
+            fig.add_subplot(4,5,2)
+            plt.imshow(data[0,1,:])
+            
+            fig.add_subplot(4,5,3)
+            plt.imshow(data[0,2,:])
+            
+            fig.add_subplot(4,5,4)
+            plt.imshow(data[0,3,:])
+
+            fig.add_subplot(4,5,5)
+            plt.imshow(data[0,4,:])
+            
+            fig.add_subplot(4,5,6)
+            plt.imshow(data[0,5,:])
+            
+            fig.add_subplot(4,5,7)
+            plt.imshow(data[0,6,:])
+            
+            fig.add_subplot(4,5,8)
+            plt.imshow(data[0,7,:])
+            
+            fig.add_subplot(4,5,9)
+            plt.imshow(data[0,8,:])
+
+            fig.add_subplot(4,5,10)
+            plt.imshow(data[0,9,:])
+
+            
+            fig.add_subplot(4,5,11)
+            plt.imshow(data[1,0,:])
+            
+            fig.add_subplot(4,5,12)
+            plt.imshow(data[1,1,:])
+            
+            fig.add_subplot(4,5,13)
+            plt.imshow(data[1,2,:])
+            
+            fig.add_subplot(4,5,14)
+            plt.imshow(data[1,3,:])
+
+            fig.add_subplot(4,5,15)
+            plt.imshow(data[1,4,:])
+            
+            fig.add_subplot(4,5,16)
+            plt.imshow(data[1,5,:])
+            
+            fig.add_subplot(4,5,17)
+            plt.imshow(data[1,6,:])
+            
+            fig.add_subplot(4,5,18)
+            plt.imshow(data[1,7,:])
+            
+            fig.add_subplot(4,5,19)
+            plt.imshow(data[1,8,:])
+
+            fig.add_subplot(4,5,20)
+            plt.imshow(data[1,9,:])
+
+            plt.show()
+            #break
             data, target = data.to(device), target.to(device)
             optimizer.zero_grad()
             output = model(data)
