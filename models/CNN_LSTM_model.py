@@ -37,12 +37,10 @@ class CLSTM(models.resnet.ResNet):
         self.image_width = 224
         self.image_height = 224
         self.class_num = class_num
-        
-        _dropout = 0.7
-        
         if pretrained:
             self.load_state_dict(models.resnet50(pretrained=True).state_dict())
-        
+
+        _dropout = 0.5        
         cnn_out_size = 2048
         self.lstm = nn.LSTM(cnn_out_size, self.hidden_dim, dropout=_dropout, num_layers=self.num_layers, batch_first=False)
         
@@ -50,6 +48,7 @@ class CLSTM(models.resnet.ResNet):
         self.hidden1_fc = nn.Linear(self.hidden_dim, self.hidden_dim // 2)
         self.hidden2_fc = nn.Linear(self.hidden_dim // 2, self.class_num)
         # dropout
+
         self.dropout = nn.Dropout(p=_dropout)
         
     def forward(self, x):
@@ -80,6 +79,7 @@ class CLSTM(models.resnet.ResNet):
         lstm_out = F.max_pool1d(lstm_out, lstm_out.size(2)).squeeze(2)
         # linear
         cnn_lstm_out = self.hidden1_fc(torch.tanh(lstm_out))
+        cnn_lstm_out = self.dropout(cnn_lstm_out) # shall we add the dropout in fc?
         cnn_lstm_out = self.hidden2_fc(torch.tanh(cnn_lstm_out))
         # output
         logit = cnn_lstm_out
@@ -101,7 +101,7 @@ def load_checkpoint(model, checkpoint_PATH):
         print('loading checkpoint!')
     return model   
     
-def train(model_in, num_epochs = 3, load_model = True):
+def train(model_in, num_epochs = 3, load_model = True, freeze_extractor = True):
     # === dataloader defination ===
     train_batch_size = 4
     valid_batch_size = 1
@@ -117,15 +117,26 @@ def train(model_in, num_epochs = 3, load_model = True):
     test_epoch_step = 10
     # ============================
 
-
+    # === got model ===
     save_file = os.path.join('../saved_model', 'CLSTM.pth')
     writer = SummaryWriter('../saved_model/tensorboard_log')
-
     if(load_model == True):
         model = load_checkpoint(model_in, save_file)
     else:
         model = model_in
-    optimizer = optim.Adam(model.parameters(), lr=0.00001)
+    # =================
+
+    # === freeze some layers against overfitting ===
+    if(freeze_extractor == True):
+        for layer_id, child in enumerate(model.children()):
+            if layer_id < 9: #layer 9 is the fc
+                for param in child.parameters():
+                    param.requires_grad = False
+        optimizer = optim.Adam(filter(lambda p: p.requires_grad, model.parameters()), lr=0.00001, weight_decay = 1.0)
+    else:
+        optimizer = optim.Adam(model.parameters(), lr=0.00001, weight_decay = 1.0)
+    # ==============================================
+
     loss_function = nn.CrossEntropyLoss()
     scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'min',verbose=1,patience=2)
 
