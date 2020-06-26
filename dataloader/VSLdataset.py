@@ -98,10 +98,11 @@ class VSLDataSet(Dataset):
         for i in indices:
             image_path = self.image_paths[i][0]
             image = Image.open(image_path)
-            if self.transform:
+            if self.transform != None:
                 image = self.transform(image)
             images.append(image)
         x = torch.stack(images)
+
         y = torch.tensor(self.image_paths[start][1], dtype=torch.long)
 
         return x, y
@@ -124,9 +125,7 @@ def load_dataset(root_dir, class_name_to_id, aug_transform):
                 paths = [(p, class_idx) for p in paths]
                 class_image_paths.extend(paths)
                 end_idx.extend([len(paths)])
-
     end_idx = [0, *end_idx]
-    
     end_idx = torch.cumsum(torch.tensor(end_idx), 0)
     seq_length = 10
 
@@ -145,21 +144,24 @@ def create_dataloader_train_valid_test(train_batch_size=32, valid_batch_size=16,
     train_transform = transforms.Compose([
         transforms.Resize((224, 224)),
         transforms.ToTensor(),
-        transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
+        transforms.Normalize(mean=[0.485, 0.456, 0.406],
+                                     std=[0.229, 0.224, 0.225])
     ])
     train_dataset, train_sampler = load_dataset(root_dir = '/media/huxi/DATA/inf_master/Semester-5/Thesis/code/dataset/train/', class_name_to_id = class_name_to_id_, aug_transform = train_transform)
     
     valid_transform = transforms.Compose([
         transforms.Resize((224, 224)),
         transforms.ToTensor(),
-        transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
+        transforms.Normalize(mean=[0.485, 0.456, 0.406],
+                                     std=[0.229, 0.224, 0.225])
     ])
     valid_dataset, valid_sampler = load_dataset(root_dir = '/media/huxi/DATA/inf_master/Semester-5/Thesis/code/dataset/valid/', class_name_to_id = class_name_to_id_, aug_transform = valid_transform)
     
     test_transform = transforms.Compose([
         transforms.Resize((224, 224)),
         transforms.ToTensor(),
-        transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
+        transforms.Normalize(mean=[0.485, 0.456, 0.406],
+                                     std=[0.229, 0.224, 0.225])
     ])
     test_dataset, test_sampler = load_dataset(root_dir = '/media/huxi/DATA/inf_master/Semester-5/Thesis/code/dataset/test/', class_name_to_id = class_name_to_id_, aug_transform = test_transform)
     
@@ -193,6 +195,46 @@ def create_dataloader_train_valid_test(train_batch_size=32, valid_batch_size=16,
     'test': test_data_loader,
     }
     return dataloaders
+
+
+# === todo test: for speeding up ===
+'''
+class DataPrefetcher():
+    def __init__(self, loader, opt):
+        self.loader = iter(loader)
+        self.opt = opt
+        self.stream = torch.cuda.Stream()
+        # With Amp, it isn't necessary to manually convert data to half.
+        # if args.fp16:
+        #     self.mean = self.mean.half()
+        #     self.std = self.std.half()
+        self.preload()
+
+    def preload(self):
+        try:
+            self.batch = next(self.loader)
+        except StopIteration:
+            self.batch = None
+            return
+        with torch.cuda.stream(self.stream):
+            for k in self.batch:
+                if k != 'meta':
+                    self.batch[k] = self.batch[k].to(device=self.opt.device, non_blocking=True)
+
+            # With Amp, it isn't necessary to manually convert data to half.
+            # if args.fp16:
+            #     self.next_input = self.next_input.half()
+            # else:
+            #     self.next_input = self.next_input.float()
+
+    def next(self):
+        torch.cuda.current_stream().wait_stream(self.stream)
+        batch = self.batch
+        self.preload()
+        return batch
+'''
+# =============================
+
 if __name__ == '__main__':
 
     dataloaders = create_dataloader_train_valid_test()

@@ -16,6 +16,7 @@ sys.path.append('../')
 
 import os
 import dataloader.VSLdataset as VSLdataset
+
 import torch.optim as optim
     
 import matplotlib.pyplot as plt
@@ -31,18 +32,22 @@ from torch.utils.tensorboard import SummaryWriter
 # https://blog.csdn.net/shanglianlm/article/details/86376627 resnet 用法
 class CLSTM(models.resnet.ResNet):
     def __init__(self, lstm_hidden_dim, lstm_num_layers, class_num, pretrained=True):
-        super().__init__(models.resnet.Bottleneck, [3, 4, 6, 3])
+        #super().__init__(models.resnet.Bottleneck, [3, 4, 6, 3])
+        super().__init__(models.resnet.BasicBlock, [2, 2, 2, 2])
+
         self.hidden_dim = lstm_hidden_dim
         self.num_layers = lstm_num_layers
         self.image_width = 224
         self.image_height = 224
         self.class_num = class_num
         if pretrained:
-            self.load_state_dict(models.resnet50(pretrained=True).state_dict())
+            #self.load_state_dict(models.resnet50(pretrained=True).state_dict())
+            self.load_state_dict(models.resnet18(pretrained=False).state_dict())
 
-        _dropout = 0.5        
-        cnn_out_size = 2048
-        self.lstm = nn.LSTM(cnn_out_size, self.hidden_dim, dropout=_dropout, num_layers=self.num_layers, batch_first=False)
+        _dropout = 0.8
+        #cnn_out_size = 2048
+        cnn_out_size = 512
+        self.lstm = nn.LSTM(cnn_out_size, self.hidden_dim, dropout=_dropout, num_layers=self.num_layers, batch_first=True)
         
         # linear
         self.hidden1_fc = nn.Linear(self.hidden_dim, self.hidden_dim // 2)
@@ -50,36 +55,48 @@ class CLSTM(models.resnet.ResNet):
         # dropout
 
         self.dropout = nn.Dropout(p=_dropout)
-        
+
+    # https://github.com/HHTseng/video-classification/blob/master/CRNN/functions.py    
     def forward(self, x):
         # size: batch, len, channel, width, height
         batch_size, timesteps, C, H, W = x.size()
+        c_in = x.view(batch_size * timesteps, C, H, W)
 
-        c_in = x.view(batch_size * timesteps, C, H, W)        
         # ResNet:
         cnn_x = self.conv1(c_in)
+
         cnn_x = self.bn1(cnn_x)
         cnn_x = self.relu(cnn_x)
         cnn_x = self.maxpool(cnn_x)
 
         cnn_x = self.layer1(cnn_x)
+
         cnn_x = self.layer2(cnn_x)
         cnn_x = self.layer3(cnn_x)
         cnn_x = self.layer4(cnn_x)
+
+
         
         cnn_x = self.avgpool(cnn_x)
-        c_out = torch.flatten(cnn_x, 1) # batch*len, 2048
-
-
-        lstm_in = c_out.view(batch_size, timesteps, -1).permute(1, 0, 2)
+        c_out = torch.flatten(cnn_x, 1) # batch*len, 2048/512
+        lstm_in = c_out.view(batch_size, timesteps, -1)
         
         lstm_out, _ = self.lstm(lstm_in)
+        #print(lstm_out.shape)
+        '''
+        print(lstm_out.shape)
         lstm_out = torch.transpose(lstm_out, 0, 1)
+        print(lstm_out.shape)
         lstm_out = torch.transpose(lstm_out, 1, 2)
+        print(lstm_out.shape)
+        print(lstm_out.size(2))
+
         lstm_out = F.max_pool1d(lstm_out, lstm_out.size(2)).squeeze(2)
+        print(lstm_out.shape)
+        '''
         # linear
-        cnn_lstm_out = self.hidden1_fc(torch.tanh(lstm_out))
-        cnn_lstm_out = self.dropout(cnn_lstm_out) # shall we add the dropout in fc?
+        cnn_lstm_out = self.hidden1_fc(torch.tanh(lstm_out[:,-1,:]))
+        #cnn_lstm_out = self.dropout(cnn_lstm_out) # shall we add the dropout in fc?
         cnn_lstm_out = self.hidden2_fc(torch.tanh(cnn_lstm_out))
         # output
         logit = cnn_lstm_out
@@ -104,7 +121,7 @@ def load_checkpoint(model, checkpoint_PATH):
 def train(model_in, num_epochs = 3, load_model = True, freeze_extractor = True):
     # === dataloader defination ===
     train_batch_size = 4
-    valid_batch_size = 1
+    valid_batch_size = 2
     test_batch_size = 1
     dataloaders = VSLdataset.create_dataloader_train_valid_test(train_batch_size, valid_batch_size, test_batch_size)
     train_dataloader = dataloaders['train']
@@ -125,16 +142,16 @@ def train(model_in, num_epochs = 3, load_model = True, freeze_extractor = True):
     else:
         model = model_in
     # =================
-
+    print(model)
     # === freeze some layers against overfitting ===
     if(freeze_extractor == True):
         for layer_id, child in enumerate(model.children()):
-            if layer_id < 9: #layer 9 is the fc
+            if layer_id < 8: #layer 9 is the fc
                 for param in child.parameters():
                     param.requires_grad = False
-        optimizer = optim.Adam(filter(lambda p: p.requires_grad, model.parameters()), lr=0.00001, weight_decay = 1.0)
+        optimizer = optim.Adam(filter(lambda p: p.requires_grad, model.parameters()), lr = 0.001) #lr=0.0000000001)
     else:
-        optimizer = optim.Adam(model.parameters(), lr=0.00001, weight_decay = 1.0)
+        optimizer = optim.Adam(model.parameters(), lr=0.001)
     # ==============================================
 
     loss_function = nn.CrossEntropyLoss()
@@ -142,9 +159,11 @@ def train(model_in, num_epochs = 3, load_model = True, freeze_extractor = True):
 
     # === runing no gpu ===
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+    # device = "cpu"
     model.to(device)
+    torch.backends.cudnn.benchmark = True
     # =====================
-
+    # epoch = 1
     
     for epoch in range(num_epochs):
         # training
@@ -153,8 +172,6 @@ def train(model_in, num_epochs = 3, load_model = True, freeze_extractor = True):
         print('Train:')
 
         for index, (data, target) in enumerate(train_dataloader):
-            #print('Epoch: ', epoch, '| Batch_index: ', index, '| data: ',data.shape, '| labels: ', target.shape)
-
             data, target = data.to(device), target.to(device)
             optimizer.zero_grad()
             output = model(data)
@@ -199,8 +216,6 @@ def train(model_in, num_epochs = 3, load_model = True, freeze_extractor = True):
                 if index_eval % 10  == 9:    # print every 10 mini-batches
                     print('[%d, %5d] loss: %.3f' %
                           (epoch + 1, index_eval + 1, loss_for_display / 10))
-                    writer.add_scalar('Valid/Loss ', loss_for_display / 10, epoch*(len(valid_dataloader)) + index_eval + 1)
-                    writer.flush()
                     loss_for_display = 0.0
 
             for i in range(len(VSLdataset.class_name_to_id_)):
@@ -212,6 +227,8 @@ def train(model_in, num_epochs = 3, load_model = True, freeze_extractor = True):
                 writer.flush()
 
             scheduler.step(loss_eval/len(valid_dataloader))
+            writer.add_scalar('Valid/Loss ', loss_eval/len(valid_dataloader), epoch)
+            writer.flush()
             loss_eval = 0.0
 
             # 每次 eval 都进行保存
@@ -238,5 +255,5 @@ def train(model_in, num_epochs = 3, load_model = True, freeze_extractor = True):
 
 if __name__=='__main__':
     #test_model()
-    model = CLSTM(lstm_hidden_dim = 128, lstm_num_layers = 2, class_num=8)        
-    train(model, 100, False)
+    model = CLSTM(lstm_hidden_dim = 32, lstm_num_layers = 2, class_num=8)        
+    train(model, 100, False, False)
