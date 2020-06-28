@@ -24,7 +24,7 @@ import matplotlib.pyplot as plt
 from torch.utils.tensorboard import SummaryWriter    
 
 """
-    Neural Network: CNN_LSTM
+    Neural Network: CNN_biLSTM
     Detail: the input crosss cnn model and LSTM model independly, then the result of both concat
 """
 
@@ -47,14 +47,16 @@ class CLSTM(models.resnet.ResNet):
             #self.load_state_dict(models.resnet18(pretrained=False).state_dict())
             #self.load_state_dict(models.resnet101(pretrained=True).state_dict())
 
-        _dropout = 0.3
+        _dropout = 0.7
         cnn_out_size = 2048
         #cnn_out_size = 512
-        self.lstm = nn.LSTM(cnn_out_size, self.hidden_dim, dropout=_dropout, num_layers=self.num_layers, batch_first=True)
+        self.lstm = nn.LSTM(cnn_out_size, self.hidden_dim, dropout=_dropout, num_layers=self.num_layers, batch_first=True, bidirectional=True)
         
         # linear
-        self.hidden1_fc = nn.Linear(self.hidden_dim, self.hidden_dim // 2)
-        self.hidden2_fc = nn.Linear(self.hidden_dim // 2, self.class_num)
+        self.hidden1_fc = nn.Linear(self.hidden_dim * 2, self.hidden_dim)
+        self.hidden2_fc = nn.Linear(self.hidden_dim, self.hidden_dim // 2)
+        self.hidden3_fc = nn.Linear(self.hidden_dim // 2, self.class_num)
+
         # dropout
 
         self.dropout = nn.Dropout(p=_dropout)
@@ -79,31 +81,23 @@ class CLSTM(models.resnet.ResNet):
         cnn_x = self.layer3(cnn_x)
         cnn_x = self.dropout(cnn_x)
         cnn_x = self.layer4(cnn_x)
-        
+
         cnn_x = self.avgpool(cnn_x)
         c_out = torch.flatten(cnn_x, 1) # batch*len, 2048/512
         lstm_in = c_out.view(batch_size, timesteps, -1)
         
         lstm_out, _ = self.lstm(lstm_in)
-        #print(lstm_out.shape)
-        '''
-        print(lstm_out.shape)
-        lstm_out = torch.transpose(lstm_out, 0, 1)
-        print(lstm_out.shape)
-        lstm_out = torch.transpose(lstm_out, 1, 2)
-        print(lstm_out.shape)
-        print(lstm_out.size(2))
 
-        lstm_out = F.max_pool1d(lstm_out, lstm_out.size(2)).squeeze(2)
-        print(lstm_out.shape)
-        '''
         # linear
         cnn_lstm_out = self.hidden1_fc(torch.tanh(lstm_out[:,-1,:]))
         cnn_lstm_out = self.dropout(cnn_lstm_out) # shall we add the dropout in fc?
         cnn_lstm_out = self.hidden2_fc(torch.tanh(cnn_lstm_out))
+        cnn_lstm_out = self.dropout(cnn_lstm_out) # shall we add the dropout in fc?
+        cnn_lstm_out = self.hidden3_fc(torch.tanh(cnn_lstm_out))
+
         # output
         logit = cnn_lstm_out
-        #print(logit.shape)
+
         return logit       
 
 # 测试一下输出的size        
@@ -138,8 +132,8 @@ def train(model_in, num_epochs = 3, load_model = True, freeze_extractor = True):
     # ============================
 
     # === got model ===
-    save_file = os.path.join('../saved_model', 'CLSTM_50.pth')
-    writer = SummaryWriter('../saved_model/tensorboard_log_50')
+    save_file = os.path.join('../saved_model', 'C-biLSTM_50.pth')
+    writer = SummaryWriter('../saved_model/tensorboard_log_bi50')
     if(load_model == True):
         model = load_checkpoint(model_in, save_file)
     else:
@@ -162,11 +156,12 @@ def train(model_in, num_epochs = 3, load_model = True, freeze_extractor = True):
 
     # === runing no gpu ===
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+    # device = "cpu"
     model.to(device)
     torch.backends.cudnn.benchmark = True
     # =====================
     # epoch = 1
-
+    
     for epoch in range(num_epochs):
         # training
         model.train()
@@ -255,72 +250,7 @@ def train(model_in, num_epochs = 3, load_model = True, freeze_extractor = True):
                 #losses.append(loss)
         '''
 
-def infer(model_in):
-    # === dataloader defination ===
-    train_batch_size = 4
-    valid_batch_size = 1
-    test_batch_size = 1
-    dataloaders = VSLdataset.create_dataloader_train_valid_test(train_batch_size, valid_batch_size, test_batch_size)
-    test_dataloader = dataloaders['valid']
-
-    # =============================
-    
-    # === every n epochs print ===
-    valid_epoch_step = 1
-
-    # ============================
-
-    # === got model ===
-    save_file = os.path.join('../saved_model', 'CLSTM_50_3.pth')
-    model = load_checkpoint(model_in, save_file)
-    # =================
-    print(model)
-    writer = SummaryWriter('../saved_model/tensorboard_network')
-    dummy_input = torch.rand(1,10,3,224,224)
-    writer.add_graph(model, dummy_input)
-    writer.close()
-    # === runing no gpu ===
-    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-    model.to(device)
-    torch.backends.cudnn.benchmark = True
-    # =====================
-    if(1):
-        if (1):
-            # validation
-            class_correct = list(0. for i in range(len(VSLdataset.class_name_to_id_)))
-            class_total = list(0. for i in range(len(VSLdataset.class_name_to_id_)))
-            class_name = list(VSLdataset.class_name_to_id_.keys())
-            model.eval()
-            print('Test:')
-
-            for index_eval, (data_eval, target_eval) in enumerate(test_dataloader):
-                data_eval, target_eval = data_eval.to(device), target_eval.to(device)
-                output_eval = model(data_eval)
-                
-                _, predicted = torch.max(output_eval, 1)
-
-                c = (predicted == target_eval).squeeze()
-                for i in range(valid_batch_size):
-                    try:
-                        label = target_eval[i]
-                        class_correct[label] += c[i].item()
-
-                    except:
-                        label = target_eval
-                        class_correct[label] += c.item()
-
-                    class_total[label] += 1
-
-
-            for i in range(len(VSLdataset.class_name_to_id_)):
-                accuracy = 100 * (class_correct[i] + 1) / (class_total[i] + 1)
-                print('Accuracy of %5s : %2d %%' % (
-                    class_name[i], accuracy))
-
 if __name__=='__main__':
     #test_model()
-    #model = CLSTM(lstm_hidden_dim = 128, lstm_num_layers = 3, class_num=8)        
-    #train(model, 100, True, False)
-
-    model = CLSTM(lstm_hidden_dim = 128, lstm_num_layers = 3, class_num=8)      
-    infer(model)
+    model = CLSTM(lstm_hidden_dim = 64, lstm_num_layers = 3, class_num=8)        
+    train(model, 100, False, False)

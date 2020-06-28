@@ -124,10 +124,10 @@ class CLSTM(nn.Module):
         #self.fc_hidden2=512
         
         # CNN architechtures
-        self.ch1, self.ch2, self.ch3, self.ch4 = 32, 64, 128, 256
-        self.k1, self.k2, self.k3, self.k4 = (5, 5), (3, 3), (3, 3), (3, 3)      # 2d kernal size
-        self.s1, self.s2, self.s3, self.s4 = (2, 2), (2, 2), (2, 2), (2, 2)      # 2d strides
-        self.pd1, self.pd2, self.pd3, self.pd4 = (0, 0), (0, 0), (0, 0), (0, 0)  # 2d padding
+        self.ch1, self.ch2, self.ch3, self.ch4, self.ch5 = 32, 64, 128, 256, 512
+        self.k1, self.k2, self.k3, self.k4, self.k5 = (5, 5), (3, 3), (3, 3), (3, 3), (3,3)      # 2d kernal size
+        self.s1, self.s2, self.s3, self.s4, self.s5 = (2, 2), (2, 2), (2, 2), (2, 2), (2,2)     # 2d strides
+        self.pd1, self.pd2, self.pd3, self.pd4, self.pd5 = (0, 0), (0, 0), (0, 0), (0, 0), (0, 0)  # 2d padding
         # conv2D output shapes
         self.conv1_outshape = conv2D_output_size((self.img_x, self.img_y), self.pd1, self.k1, self.s1)  # Conv1 output shape
         self.conv2_outshape = conv2D_output_size(self.conv1_outshape, self.pd2, self.k2, self.s2)
@@ -156,7 +156,12 @@ class CLSTM(nn.Module):
             nn.BatchNorm2d(self.ch4, momentum=0.01),
             nn.ReLU(inplace=True),
         )
-        self.avgpool = nn.AvgPool2d(7, stride=1)
+        self.conv5 = nn.Sequential(
+            nn.Conv2d(in_channels=self.ch4, out_channels=self.ch5, kernel_size=self.k5, stride=self.s5, padding=self.pd5),
+            nn.BatchNorm2d(self.ch5, momentum=0.01),
+            nn.ReLU(inplace=True),
+        )
+        self.avgpool = nn.AvgPool2d(5, stride=1)
         _dropout = 0.8
         #self.drop = nn.Dropout(_dropout)
         #self.pool = nn.MaxPool2d(2)
@@ -170,7 +175,7 @@ class CLSTM(nn.Module):
 
         
 
-        cnn_out_size = 256
+        cnn_out_size = 512
         self.lstm = nn.LSTM(cnn_out_size, self.hidden_dim, dropout=_dropout, num_layers=self.num_layers, batch_first=True)
         
         # linear
@@ -178,7 +183,7 @@ class CLSTM(nn.Module):
         self.hidden2_fc = nn.Linear(self.hidden_dim // 2, self.class_num)
         # dropout
 
-        #self.dropout = nn.Dropout(p=_dropout)
+        self.dropout = nn.Dropout(p=_dropout)
 
     # https://github.com/HHTseng/video-classification/blob/master/CRNN/functions.py    
     def forward(self, x):
@@ -191,6 +196,8 @@ class CLSTM(nn.Module):
         cnn_x = self.conv2(cnn_x)
         cnn_x = self.conv3(cnn_x)
         cnn_x = self.conv4(cnn_x)
+        cnn_x = self.conv5(cnn_x)
+
         '''
         print(cnn_x.shape)
         x = F.relu(self.fc1(x))
@@ -199,9 +206,9 @@ class CLSTM(nn.Module):
         x = F.dropout(x, p=self.drop_p, training=self.training)
         x = self.fc3(x)
         '''
-        print(cnn_x.shape)
+        #print(cnn_x.shape)
         cnn_x = self.avgpool(cnn_x)
-        print(cnn_x.shape)
+        #print(cnn_x.shape)
         c_out = torch.flatten(cnn_x, 1) # batch*len, 2048/512
       
         
@@ -249,8 +256,8 @@ def train(model_in, num_epochs = 3, load_model = True, freeze_extractor = True):
     # ============================
 
     # === got model ===
-    save_file = os.path.join('../saved_model', 'CLSTM.pth')
-    writer = SummaryWriter('../saved_model/tensorboard_log')
+    save_file = os.path.join('../saved_model', 'simple_CLSTM.pth')
+    writer = SummaryWriter('../saved_model/tensorboard_log_simple')
     if(load_model == True):
         model = load_checkpoint(model_in, save_file)
     else:
@@ -369,5 +376,5 @@ def train(model_in, num_epochs = 3, load_model = True, freeze_extractor = True):
 
 if __name__=='__main__':
     #test_model()
-    model = CLSTM(lstm_hidden_dim = 32, lstm_num_layers = 2, class_num=8)        
+    model = CLSTM(lstm_hidden_dim = 128, lstm_num_layers = 2, class_num=8)        
     train(model, 100, False, False)
