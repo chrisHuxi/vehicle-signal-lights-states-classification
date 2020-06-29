@@ -169,7 +169,7 @@ def load_dataset(root_dir, class_name_to_id, aug_transform_list, imba_transform_
                 end_idx.extend([len(paths)])
     end_idx = [0, *end_idx]
     end_idx = torch.cumsum(torch.tensor(end_idx), 0)
-    seq_length = 10
+    seq_length = 10 #TODO: 16
 
     sampler = FramesSampler(end_idx, seq_length)
 

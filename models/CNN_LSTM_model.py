@@ -47,9 +47,9 @@ class CLSTM(models.resnet.ResNet):
             #self.load_state_dict(models.resnet18(pretrained=False).state_dict())
             #self.load_state_dict(models.resnet101(pretrained=True).state_dict())
 
-        _dropout = 0.3
+        _dropout = 0.5 #TODO:0.3
         cnn_out_size = 2048
-        #cnn_out_size = 512
+        #cnn_out_size = 512 # for resnet18
         self.lstm = nn.LSTM(cnn_out_size, self.hidden_dim, dropout=_dropout, num_layers=self.num_layers, batch_first=True)
         
         # linear
@@ -57,7 +57,12 @@ class CLSTM(models.resnet.ResNet):
         self.hidden2_fc = nn.Linear(self.hidden_dim // 2, self.class_num)
         # dropout
 
-        self.dropout = nn.Dropout(p=_dropout)
+        self.dropout_cnn0 = nn.Dropout(p=_dropout)
+        self.dropout_cnn1 = nn.Dropout(p=_dropout)
+        self.dropout_cnn2 = nn.Dropout(p=_dropout)
+
+        self.dropout_fc = nn.Dropout(p=_dropout)
+
 
     # https://github.com/HHTseng/video-classification/blob/master/CRNN/functions.py    
     def forward(self, x):
@@ -73,11 +78,11 @@ class CLSTM(models.resnet.ResNet):
         cnn_x = self.maxpool(cnn_x)
 
         cnn_x = self.layer1(cnn_x)
-        cnn_x = self.dropout(cnn_x)
+        cnn_x = self.dropout_cnn0(cnn_x)
         cnn_x = self.layer2(cnn_x)
-        cnn_x = self.dropout(cnn_x)
+        cnn_x = self.dropout_cnn1(cnn_x)
         cnn_x = self.layer3(cnn_x)
-        cnn_x = self.dropout(cnn_x)
+        cnn_x = self.dropout_cnn2(cnn_x)
         cnn_x = self.layer4(cnn_x)
         
         cnn_x = self.avgpool(cnn_x)
@@ -86,20 +91,10 @@ class CLSTM(models.resnet.ResNet):
         
         lstm_out, _ = self.lstm(lstm_in)
         #print(lstm_out.shape)
-        '''
-        print(lstm_out.shape)
-        lstm_out = torch.transpose(lstm_out, 0, 1)
-        print(lstm_out.shape)
-        lstm_out = torch.transpose(lstm_out, 1, 2)
-        print(lstm_out.shape)
-        print(lstm_out.size(2))
 
-        lstm_out = F.max_pool1d(lstm_out, lstm_out.size(2)).squeeze(2)
-        print(lstm_out.shape)
-        '''
         # linear
         cnn_lstm_out = self.hidden1_fc(torch.tanh(lstm_out[:,-1,:]))
-        cnn_lstm_out = self.dropout(cnn_lstm_out) # shall we add the dropout in fc?
+        cnn_lstm_out = self.dropout_fc(cnn_lstm_out) # shall we add the dropout in fc?
         cnn_lstm_out = self.hidden2_fc(torch.tanh(cnn_lstm_out))
         # output
         logit = cnn_lstm_out
@@ -138,8 +133,8 @@ def train(model_in, num_epochs = 3, load_model = True, freeze_extractor = True):
     # ============================
 
     # === got model ===
-    save_file = os.path.join('../saved_model', 'CLSTM_50.pth')
-    writer = SummaryWriter('../saved_model/tensorboard_log_50')
+    save_file = os.path.join('../saved_model', 'CLSTM_50_new_drop.pth')
+    writer = SummaryWriter('../saved_model/tensorboard_log_50_new_drop')
     if(load_model == True):
         model = load_checkpoint(model_in, save_file)
     else:
@@ -227,7 +222,7 @@ def train(model_in, num_epochs = 3, load_model = True, freeze_extractor = True):
                 # Record loss and accuracy from the test run into the writer
                 writer.add_scalar('Valid/Accuracy ' + str(class_name[i]), accuracy, epoch)
                 writer.flush()
-
+            print('avg_loss: ', loss_eval/len(valid_dataloader))
             scheduler.step(loss_eval/len(valid_dataloader))
             writer.add_scalar('Valid/Loss ', loss_eval/len(valid_dataloader), epoch)
             writer.flush()
@@ -242,18 +237,6 @@ def train(model_in, num_epochs = 3, load_model = True, freeze_extractor = True):
                 'loss': train_loss
             }, save_file)
             print("saved model.")
-        # test ==> TODO
-        '''
-        model.eval()
-        if (epoch%test_epoch_step == 0):
-            valid_losses = []
-            print('Test:')
-            for index, batch in enumerate(test_dataloader):
-                
-                print('Epoch: ', epoch, '| Batch_index: ', index, '| data: ',data.shape, '| labels: ', target.shape)
-                #loss = self._val_step(epoch, index, batch)
-                #losses.append(loss)
-        '''
 
 def infer(model_in):
     # === dataloader defination ===
@@ -319,8 +302,8 @@ def infer(model_in):
 
 if __name__=='__main__':
     #test_model()
-    #model = CLSTM(lstm_hidden_dim = 128, lstm_num_layers = 3, class_num=8)        
-    #train(model, 100, True, False)
+    model = CLSTM(lstm_hidden_dim = 128, lstm_num_layers = 3, class_num=8)        
+    train(model, 100, False, False)
 
-    model = CLSTM(lstm_hidden_dim = 128, lstm_num_layers = 3, class_num=8)      
-    infer(model)
+    #model = CLSTM(lstm_hidden_dim = 128, lstm_num_layers = 3, class_num=8)      
+    #infer(model)
