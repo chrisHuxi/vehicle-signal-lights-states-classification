@@ -47,7 +47,7 @@ class CLSTM(models.resnet.ResNet):
             #self.load_state_dict(models.resnet18(pretrained=False).state_dict())
             #self.load_state_dict(models.resnet101(pretrained=True).state_dict())
 
-        _dropout = 0.5 #TODO:0.3
+        _dropout = 0.3 #TODO:0.3
         cnn_out_size = 2048
         #cnn_out_size = 512 # for resnet18
         self.lstm = nn.LSTM(cnn_out_size, self.hidden_dim, dropout=_dropout, num_layers=self.num_layers, batch_first=True)
@@ -118,7 +118,7 @@ def load_checkpoint(model, checkpoint_PATH):
     
 def train(model_in, num_epochs = 3, load_model = True, freeze_extractor = True):
     # === dataloader defination ===
-    train_batch_size = 4
+    train_batch_size = 2
     valid_batch_size = 1
     test_batch_size = 1
     dataloaders = VSLdataset.create_dataloader_train_valid_test(train_batch_size, valid_batch_size, test_batch_size)
@@ -133,8 +133,8 @@ def train(model_in, num_epochs = 3, load_model = True, freeze_extractor = True):
     # ============================
 
     # === got model ===
-    save_file = os.path.join('../saved_model', 'CLSTM_50_new_drop.pth')
-    writer = SummaryWriter('../saved_model/tensorboard_log_50_new_drop')
+    save_file = os.path.join('../saved_model', 'CLSTM_50_l16_03_drop.pth')
+    writer = SummaryWriter('../saved_model/tensorboard_log_50_l16_03_drop')
     if(load_model == True):
         model = load_checkpoint(model_in, save_file)
     else:
@@ -303,7 +303,7 @@ def infer(model_in):
 if __name__=='__main__':
     #test_model()
     model = CLSTM(lstm_hidden_dim = 128, lstm_num_layers = 3, class_num=8)        
-    train(model, 100, False, False)
+    train(model_in = model, num_epochs = 100, load_model = True, freeze_extractor = False)
 
     #model = CLSTM(lstm_hidden_dim = 128, lstm_num_layers = 3, class_num=8)      
     #infer(model)

@@ -141,6 +141,12 @@ class VSLDataSet(Dataset):
                                                                         image6=images[7],
                                                                         image7=images[8],
                                                                         image8=images[9])
+                                                                        #image9=images[10],
+                                                                        #image10=images[11],
+                                                                        #image11=images[12],
+                                                                        #image12=images[13],
+                                                                        #image13=images[14],
+                                                                        #image14=images[15])
                 images_after_transform = []
                 for img_name in augmented.keys():
                     img_after_transform = augmented[img_name]
@@ -297,25 +303,32 @@ if __name__ == '__main__':
     for epoch in range(num_epochs):
         # training
         print('Train:')
-        #for index, (data, target) in enumerate(train_dataloader):
+        for index, (data, target) in enumerate(train_dataloader):
         #    print('Epoch: ', epoch, '| Batch_index: ', index, '| data: ',data.shape, '| labels: ', target.shape)
-        '''
-            print(target)
+        
+            print(data.shape)
             fig=plt.figure(figsize=(12, 6))
-            fig.add_subplot(1,3,1)
+            fig.add_subplot(2,3,1)
             plt.imshow(data[0,0].view(data[0,0].shape[0], data[0,0].shape[1], data[0,0].shape[2]).permute(1, 2, 0))
 
-            #for row in data[0,1, 0,:,:].numpy():
-            #    print(max(row))
-
-            fig.add_subplot(1,3,2)
+            fig.add_subplot(2,3,2)
             plt.imshow(data[0,1].view(data[0,0].shape[0], data[0,0].shape[1], data[0,0].shape[2]).permute(1, 2, 0))
 
-            fig.add_subplot(1,3,3)
+            fig.add_subplot(2,3,3)
             plt.imshow(data[0,2].view(data[0,0].shape[0], data[0,0].shape[1], data[0,0].shape[2]).permute(1, 2, 0))
+
+            fig.add_subplot(2,3,4)
+            plt.imshow(data[0,-3].view(data[0,0].shape[0], data[0,0].shape[1], data[0,0].shape[2]).permute(1, 2, 0))
+
+            fig.add_subplot(2,3,5)
+            plt.imshow(data[0,-2].view(data[0,0].shape[0], data[0,0].shape[1], data[0,0].shape[2]).permute(1, 2, 0))
+
+            fig.add_subplot(2,3,6)
+            plt.imshow(data[0,-1].view(data[0,0].shape[0], data[0,0].shape[1], data[0,0].shape[2]).permute(1, 2, 0))
+
             plt.savefig('foo.png')
             input('test')
-        '''
+        
         # validation
         # model.eval()
         if (epoch%valid_epoch_step == 0):
