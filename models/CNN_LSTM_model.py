@@ -245,61 +245,74 @@ def infer(model_in):
     test_batch_size = 1
     dataloaders = VSLdataset.create_dataloader_train_valid_test(train_batch_size, valid_batch_size, test_batch_size)
     test_dataloader = dataloaders['valid']
-
     # =============================
-    
-    # === every n epochs print ===
-    valid_epoch_step = 1
-
-    # ============================
 
     # === got model ===
-    save_file = os.path.join('../saved_model', 'CLSTM_50_3.pth')
+    save_file = os.path.join('../saved_model', 'CLSTM_50_l16_03_drop.pth')
     model = load_checkpoint(model_in, save_file)
     # =================
     print(model)
-    writer = SummaryWriter('../saved_model/tensorboard_network')
-    dummy_input = torch.rand(1,10,3,224,224)
-    writer.add_graph(model, dummy_input)
-    writer.close()
+
     # === runing no gpu ===
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     model.to(device)
     torch.backends.cudnn.benchmark = True
     # =====================
-    if(1):
-        if (1):
-            # validation
-            class_correct = list(0. for i in range(len(VSLdataset.class_name_to_id_)))
-            class_total = list(0. for i in range(len(VSLdataset.class_name_to_id_)))
-            class_name = list(VSLdataset.class_name_to_id_.keys())
-            model.eval()
-            print('Test:')
 
-            for index_eval, (data_eval, target_eval) in enumerate(test_dataloader):
-                data_eval, target_eval = data_eval.to(device), target_eval.to(device)
-                output_eval = model(data_eval)
-                
-                _, predicted = torch.max(output_eval, 1)
+    # validation
+    class_correct = list(0. for i in range(len(VSLdataset.class_name_to_id_)))
+    class_total = list(0. for i in range(len(VSLdataset.class_name_to_id_)))
+    class_name = list(VSLdataset.class_name_to_id_.keys())
+    model.eval()
+    print('Test:')
+    
+    all_targets = np.zeros((len(test_dataloader), 1))
+    all_scores = np.zeros((len(test_dataloader), 8))
+    all_predicted_flatten = np.zeros((len(test_dataloader), 1))
+    
+    for index_eval, (data_eval, target_eval) in enumerate(test_dataloader):
+        data_eval, target_eval = data_eval.to(device), target_eval.to(device)
+        output_eval = model(data_eval)
+        
+        all_targets[index_eval, :] = target_eval[0].cpu().detach().numpy()
+        all_scores[index_eval, :] = output_eval[0].cpu().detach().numpy()
+             
+        _, predicted = torch.max(output_eval, 1)
+        all_predicted_flatten[index_eval, :] = predicted[0].cpu().detach().numpy()
+        
+        if(predicted != target_eval): # batch_size, timesteps, C, H, W
+            print('mis_classified: ', index_eval)
+            visualize_mis_class(data_eval[0], str(index_eval) + '.png')
+        
+        c = (predicted == target_eval).squeeze()
+        for i in range(valid_batch_size):
+            try:
+                label = target_eval[i]
+                class_correct[label] += c[i].item()
+            except:
+                label = target_eval
+                class_correct[label] += c.item()
+            class_total[label] += 1
 
-                c = (predicted == target_eval).squeeze()
-                for i in range(valid_batch_size):
-                    try:
-                        label = target_eval[i]
-                        class_correct[label] += c[i].item()
+    for i in range(len(VSLdataset.class_name_to_id_)):
+        accuracy = 100 * (class_correct[i] + 1) / (class_total[i] + 1)
+        print('Accuracy of %5s : %2d %%' % (
+            class_name[i], accuracy))
+            
+    # === draw roc and confusion mat ===
+    draw_roc_bin(all_targets, all_scores)
+    draw_confusion_matrix(all_targets, all_predicted_flatten)
+    # === draw roc and confusion mat end ===
+            
+def visualize_mis_class(frames, saved_name) # timesteps, C, H, W
+    fig=plt.figure(figsize=(12, 6))
+    for i in range(10):
+        fig.add_subplot(2,5,i) 
+        plt.imshow(frames[i])
+    save_file = os.path.join('../mis_classified', saved_name)
+    plt.savefig(saved_name)
 
-                    except:
-                        label = target_eval
-                        class_correct[label] += c.item()
-
-                    class_total[label] += 1
-
-
-            for i in range(len(VSLdataset.class_name_to_id_)):
-                accuracy = 100 * (class_correct[i] + 1) / (class_total[i] + 1)
-                print('Accuracy of %5s : %2d %%' % (
-                    class_name[i], accuracy))
-
+            
 if __name__=='__main__':
     #test_model()
     model = CLSTM(lstm_hidden_dim = 128, lstm_num_layers = 3, class_num=8)        

@@ -1,0 +1,64 @@
+import numpy as np
+import matplotlib.pyplot as plt
+
+from sklearn.metrics import roc_curve, auc
+
+from sklearn.preprocessing import label_binarize
+
+from sklearn.metrics import roc_auc_score, confusion_matrix, plot_confusion_matrix
+
+# draw confusion matrix
+import seaborn as sn
+import pandas as pd
+
+import dataloader.VSLdataset as VSLdataset
+import os
+
+# https://scikit-learn.org/stable/auto_examples/model_selection/plot_roc.html
+def draw_roc_bin(y_label, y_predicted):
+    n_classes = 8
+    # Compute ROC curve and ROC area for each class
+    fpr = dict()
+    tpr = dict()
+    roc_auc = dict()
+    print('-----------------')
+    print(y_label.shape)
+    y_label_bin = label_binarize(y_label, classes=[0, 1, 2, 3, 4, 5, 6, 7])
+    print(y_label_bin.shape)
+    print('--------++-------')
+    
+    for i in range(n_classes):
+        fpr[i], tpr[i], _ = roc_curve(y_label_bin[:, i], y_predicted[:, i])
+        roc_auc[i] = auc(fpr[i], tpr[i])
+
+    # Compute micro-average ROC curve and ROC area
+    fpr["micro"], tpr["micro"], _ = roc_curve(y_label_bin.ravel(), y_predicted.ravel())
+    roc_auc["micro"] = auc(fpr["micro"], tpr["micro"])
+
+    plt.figure()
+    lw = 2
+    plt.plot(fpr[2], tpr[2], color='darkorange',
+             lw=lw, label='ROC curve (area = %0.2f)' % roc_auc[2])
+    plt.plot([0, 1], [0, 1], color='navy', lw=lw, linestyle='--')
+    plt.xlim([0.0, 1.0])
+    plt.ylim([0.0, 1.05])
+    plt.xlabel('False Positive Rate')
+    plt.ylabel('True Positive Rate')
+    plt.title('Receiver operating characteristic example')
+    plt.legend(loc="lower right")
+    save_file = os.path.join('../output', 'roc.png')
+    plt.savefig(save_file)
+    
+# https://stackoverflow.com/questions/35572000/how-can-i-plot-a-confusion-matrix
+def draw_confusion_matrix(y_label, y_predicted_flatten):
+    confusion_matrix = confusion_matrix(y_label, y_predicted_flatten)
+    df_cm = pd.DataFrame(confusion_matrix,  index=[ VSLdataset.class_name_to_id_[i] for i in range(8) ], columns=[ VSLdataset.class_name_to_id_[i] for i in range(8)] )
+    plt.figure(figsize=(10,7))
+    sn.set(font_scale=1.4) # for label size
+    sn.heatmap(df_cm, annot=True, annot_kws={"size": 16}) # font size
+    save_file = os.path.join('../output', 'confusion_matrix.png')
+    plt.savefig(save_file)
+
+    
+    
+    
