@@ -21,11 +21,8 @@ def draw_roc_bin(y_label, y_predicted):
     fpr = dict()
     tpr = dict()
     roc_auc = dict()
-    print('-----------------')
-    print(y_label.shape)
+
     y_label_bin = label_binarize(y_label, classes=[0, 1, 2, 3, 4, 5, 6, 7])
-    print(y_label_bin.shape)
-    print('--------++-------')
     
     for i in range(n_classes):
         fpr[i], tpr[i], _ = roc_curve(y_label_bin[:, i], y_predicted[:, i])
@@ -51,11 +48,12 @@ def draw_roc_bin(y_label, y_predicted):
     
 # https://stackoverflow.com/questions/35572000/how-can-i-plot-a-confusion-matrix
 def draw_confusion_matrix(y_label, y_predicted_flatten):
-    confusion_matrix = confusion_matrix(y_label, y_predicted_flatten)
-    df_cm = pd.DataFrame(confusion_matrix,  index=[ VSLdataset.class_name_to_id_[i] for i in range(8) ], columns=[ VSLdataset.class_name_to_id_[i] for i in range(8)] )
+    class_list = list(VSLdataset.class_name_to_id_)
+    cm = confusion_matrix(y_label, y_predicted_flatten)
+    df_cm = pd.DataFrame(cm,  index=[ class_list[i] for i in range(8) ], columns=[ class_list[i] for i in range(8)] )
     plt.figure(figsize=(10,7))
     sn.set(font_scale=1.4) # for label size
-    sn.heatmap(df_cm, annot=True, annot_kws={"size": 16}) # font size
+    sn.heatmap(df_cm, linewidths=1, annot=True, fmt='g', cmap="YlGnBu") # font size
     save_file = os.path.join('../output', 'confusion_matrix.png')
     plt.savefig(save_file)
 

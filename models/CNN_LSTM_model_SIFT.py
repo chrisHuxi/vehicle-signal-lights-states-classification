@@ -15,15 +15,13 @@ import sys
 sys.path.append('../')
 
 import os
-import dataloader.VSLdataset as VSLdataset
+import dataloader.VSLdataset_SIFT as VSLdataset
 
 import torch.optim as optim
     
 import matplotlib.pyplot as plt
 
 from torch.utils.tensorboard import SummaryWriter    
-
-import evaluate
 
 """
     Neural Network: CNN_LSTM
@@ -45,7 +43,7 @@ class CLSTM(models.resnet.ResNet):
         self.image_height = 224
         self.class_num = class_num
         if pretrained:
-            self.load_state_dict(models.resnet50(pretrained=True).state_dict())
+            self.load_state_dict(models.resnet50(pretrained=False).state_dict())
             #self.load_state_dict(models.resnet18(pretrained=False).state_dict())
             #self.load_state_dict(models.resnet101(pretrained=True).state_dict())
 
@@ -135,8 +133,8 @@ def train(model_in, num_epochs = 3, load_model = True, freeze_extractor = True):
     # ============================
 
     # === got model ===
-    save_file = os.path.join('../saved_model', 'CLSTM_50_l16_03_drop.pth')
-    writer = SummaryWriter('../saved_model/tensorboard_log_50_l16_03_drop')
+    save_file = os.path.join('../saved_model', 'CLSTM_50_l10_SIFT.pth')
+    writer = SummaryWriter('../saved_model/tensorboard_log_50_l10_SIFT')
     if(load_model == True):
         model = load_checkpoint(model_in, save_file)
     else:
@@ -242,84 +240,71 @@ def train(model_in, num_epochs = 3, load_model = True, freeze_extractor = True):
 
 def infer(model_in):
     # === dataloader defination ===
-    train_batch_size = 1
+    train_batch_size = 4
     valid_batch_size = 1
     test_batch_size = 1
     dataloaders = VSLdataset.create_dataloader_train_valid_test(train_batch_size, valid_batch_size, test_batch_size)
-    valid_dataloader = dataloaders['valid']
+    test_dataloader = dataloaders['valid']
+
     # =============================
+    
+    # === every n epochs print ===
+    valid_epoch_step = 1
+
+    # ============================
 
     # === got model ===
-    save_file = os.path.join('../saved_model', 'CLSTM_50_l10_h512_loss021_best.pth')
+    save_file = os.path.join('../saved_model', 'CLSTM_50_3.pth')
     model = load_checkpoint(model_in, save_file)
     # =================
     print(model)
-
+    writer = SummaryWriter('../saved_model/tensorboard_network')
+    dummy_input = torch.rand(1,10,3,224,224)
+    writer.add_graph(model, dummy_input)
+    writer.close()
     # === runing no gpu ===
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     model.to(device)
     torch.backends.cudnn.benchmark = True
     # =====================
+    if(1):
+        if (1):
+            # validation
+            class_correct = list(0. for i in range(len(VSLdataset.class_name_to_id_)))
+            class_total = list(0. for i in range(len(VSLdataset.class_name_to_id_)))
+            class_name = list(VSLdataset.class_name_to_id_.keys())
+            model.eval()
+            print('Test:')
 
-    # validation
-    class_correct = list(0. for i in range(len(VSLdataset.class_name_to_id_)))
-    class_total = list(0. for i in range(len(VSLdataset.class_name_to_id_)))
-    class_name = list(VSLdataset.class_name_to_id_.keys())
-    model.eval()
-    print('Test:')
-    
-    all_targets = np.zeros((len(valid_dataloader), 1))
-    all_scores = np.zeros((len(valid_dataloader), 8))
-    all_predicted_flatten = np.zeros((len(valid_dataloader), 1))
-    
-    for index_eval, (data_eval, target_eval) in enumerate(valid_dataloader):
-        data_eval, target_eval = data_eval.to(device), target_eval.to(device)
-        output_eval = model(data_eval)
-        
-        all_targets[index_eval, :] = target_eval[0].cpu().detach().numpy()
-        all_scores[index_eval, :] = output_eval[0].cpu().detach().numpy()
-             
-        _, predicted = torch.max(output_eval, 1)
-        all_predicted_flatten[index_eval, :] = predicted[0].cpu().detach().numpy()
-        if(predicted != target_eval): # batch_size, timesteps, C, H, W
-            print('mis_classified: ', index_eval)
-            visualize_mis_class(data_eval[0].permute(0, 2, 3, 1).cpu(), str(index_eval) + '.png', class_name[target_eval[0].cpu().numpy()], class_name[predicted[0].cpu().numpy()])
-        
-        c = (predicted == target_eval).squeeze()
-        for i in range(valid_batch_size):
-            try:
-                label = target_eval[i]
-                class_correct[label] += c[i].item()
-            except:
-                label = target_eval
-                class_correct[label] += c.item()
-            class_total[label] += 1
+            for index_eval, (data_eval, target_eval) in enumerate(test_dataloader):
+                data_eval, target_eval = data_eval.to(device), target_eval.to(device)
+                output_eval = model(data_eval)
+                
+                _, predicted = torch.max(output_eval, 1)
 
-    for i in range(len(VSLdataset.class_name_to_id_)):
-        accuracy = 100 * (class_correct[i] + 1) / (class_total[i] + 1)
-        print('Accuracy of %5s : %2d %%' % (
-            class_name[i], accuracy))
-            
-    # === draw roc and confusion mat ===
-    evaluate.draw_roc_bin(all_targets, all_scores)
-    evaluate.draw_confusion_matrix(all_targets, all_predicted_flatten)
-    # === draw roc and confusion mat end ===
-            
-def visualize_mis_class(frames, saved_name, true_label, false_label): # timesteps, C, H, W
-    fig=plt.figure(figsize=(10, 6))
-    fig.suptitle('GT: ' + true_label+'   Predicted:'+false_label)
-    for i in range(10):
-        fig.add_subplot(2,5,i+1) 
-        plt.imshow(frames[i])
-    save_file = os.path.join('../mis_classified', saved_name)
-    plt.savefig(save_file)
-    plt.close('all')
+                c = (predicted == target_eval).squeeze()
+                for i in range(valid_batch_size):
+                    try:
+                        label = target_eval[i]
+                        class_correct[label] += c[i].item()
 
-            
+                    except:
+                        label = target_eval
+                        class_correct[label] += c.item()
+
+                    class_total[label] += 1
+
+
+            for i in range(len(VSLdataset.class_name_to_id_)):
+                accuracy = 100 * (class_correct[i] + 1) / (class_total[i] + 1)
+                print('Accuracy of %5s : %2d %%' % (
+                    class_name[i], accuracy))
+
 if __name__=='__main__':
     #test_model()
-    #model = CLSTM(lstm_hidden_dim = 128, lstm_num_layers = 3, class_num=8)        
-    #train(model_in = model, num_epochs = 100, load_model = True, freeze_extractor = False)
+    #model = CLSTM(lstm_hidden_dim = 128, lstm_num_layers = 3, class_num=8)
+    model = CLSTM(lstm_hidden_dim = 512, lstm_num_layers = 3, class_num=4)
+    train(model_in = model, num_epochs = 100, load_model = False, freeze_extractor = False)
 
-    model = CLSTM(lstm_hidden_dim = 512, lstm_num_layers = 3, class_num=8)      
-    infer(model)
+    #model = CLSTM(lstm_hidden_dim = 128, lstm_num_layers = 3, class_num=8)      
+    #infer(model)
