@@ -15,8 +15,8 @@ import sys
 sys.path.append('../')
 
 import os
-import dataloader.VSLdataset as VSLdataset
-
+#import dataloader.VSLdataset as VSLdataset
+import dataloader.VSLdataset_yoloraw as VSLdataset
 import torch.optim as optim
     
 import matplotlib.pyplot as plt
@@ -135,8 +135,8 @@ def train(model_in, num_epochs = 3, load_model = True, freeze_extractor = True):
     # ============================
 
     # === got model ===
-    save_file = os.path.join('../saved_model', 'CLSTM_50_l16_03_drop.pth')
-    writer = SummaryWriter('../saved_model/tensorboard_log_50_l16_03_drop')
+    save_file = os.path.join('../saved_model', 'CLSTM_50_l10_h512_yoloraw.pth')
+    writer = SummaryWriter('../saved_model/tensorboard_log_50_l10_h512_yoloraw')
     if(load_model == True):
         model = load_checkpoint(model_in, save_file)
     else:
@@ -250,7 +250,7 @@ def infer(model_in):
     # =============================
 
     # === got model ===
-    save_file = os.path.join('../saved_model', 'CLSTM_50_l10_h512_loss021_best.pth')
+    save_file = os.path.join('../saved_model', 'CLSTM_50_l10_h512_yoloraw_loss03.pth')
     model = load_checkpoint(model_in, save_file)
     # =================
     print(model)
@@ -318,8 +318,8 @@ def visualize_mis_class(frames, saved_name, true_label, false_label): # timestep
             
 if __name__=='__main__':
     #test_model()
-    #model = CLSTM(lstm_hidden_dim = 128, lstm_num_layers = 3, class_num=8)        
-    #train(model_in = model, num_epochs = 100, load_model = True, freeze_extractor = False)
+    #model = CLSTM(lstm_hidden_dim = 512, lstm_num_layers = 4, class_num=8)        
+    #train(model_in = model, num_epochs = 100, load_model = False, freeze_extractor = False)
 
-    model = CLSTM(lstm_hidden_dim = 512, lstm_num_layers = 3, class_num=8)      
+    model = CLSTM(lstm_hidden_dim = 512, lstm_num_layers = 4, class_num=8)      
     infer(model)
