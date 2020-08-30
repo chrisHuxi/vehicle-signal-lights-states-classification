@@ -10,14 +10,16 @@ import torch.nn.functional as F
 
 import numpy as np
 import torchvision.models as models
+import third_party.resnet3d as resnet3d #I3Res50 as I3Res50
 
 import sys
 sys.path.append('../')
 
-import os
-import dataloader.VSLdataset_long as VSLdataset
-#import dataloader.VSLdataset as VSLdataset
 
+
+import os
+import dataloader.VSLdataset as VSLdataset
+#import dataloader.VSLdataset_yoloraw as VSLdataset
 import torch.optim as optim
     
 import matplotlib.pyplot as plt
@@ -33,79 +35,11 @@ import evaluate
 
 from torch.autograd import Variable
 
-class FocalLoss(nn.Module):
-    r"""
-        This criterion is a implemenation of Focal Loss, which is proposed in 
-        Focal Loss for Dense Object Detection.
-
-            Loss(x, class) = - \alpha (1-softmax(x)[class])^gamma \log(softmax(x)[class])
-
-        The losses are averaged across observations for each minibatch.
-
-        Args:
-            alpha(1D Tensor, Variable) : the scalar factor for this criterion
-            gamma(float, double) : gamma > 0; reduces the relative loss for well-classiﬁed examples (p > .5), 
-                                   putting more focus on hard, misclassiﬁed examples
-            size_average(bool): By default, the losses are averaged over observations for each minibatch.
-                                However, if the field size_average is set to False, the losses are
-                                instead summed for each minibatch.
-
-
-    """
-    def __init__(self, class_num, alpha=None, gamma=2, size_average=True):
-        super(FocalLoss, self).__init__()
-        if alpha is None:
-            self.alpha = Variable(torch.ones(class_num, 1))
-        else:
-            if isinstance(alpha, Variable):
-                self.alpha = alpha
-            else:
-                self.alpha = Variable(alpha)
-        self.gamma = gamma
-        self.class_num = class_num
-        self.size_average = size_average
-
-    def forward(self, inputs, targets):
-        N = inputs.size(0)
-        C = inputs.size(1)
-        P = F.softmax(inputs, dim = 1)
-
-        class_mask = inputs.data.new(N, C).fill_(0)
-        class_mask = Variable(class_mask)
-        ids = targets.view(-1, 1)
-        class_mask.scatter_(1, ids.data, 1.)
-        #print(class_mask)
-
-
-        if inputs.is_cuda and not self.alpha.is_cuda:
-            self.alpha = self.alpha.cuda()
-        alpha = self.alpha[ids.data.view(-1)]
-
-        probs = (P*class_mask).sum(1).view(-1,1)
-
-        log_p = probs.log()
-        #print('probs size= {}'.format(probs.size()))
-        #print(probs)
-
-        batch_loss = -alpha*(torch.pow((1-probs), self.gamma))*log_p 
-        #print('-----bacth_loss------')
-        #print(batch_loss)
-
-
-        if self.size_average:
-            loss = batch_loss.mean()
-        else:
-            loss = batch_loss.sum()
-        return loss
-
 # https://discuss.pytorch.org/t/solved-concatenate-time-distributed-cnn-with-lstm/15435/4
 # https://blog.csdn.net/shanglianlm/article/details/86376627 resnet 用法
-class CLSTM(models.resnet.ResNet):
+class CLSTM(resnet3d.I3Res50):
     def __init__(self, lstm_hidden_dim, lstm_num_layers, class_num, pretrained=True):
-        super().__init__(models.resnet.Bottleneck, [3, 4, 6, 3]) # 50
-        #super().__init__(models.resnet.Bottleneck, [3, 4, 23, 3]) # 101
-        
-        #super().__init__(models.resnet.BasicBlock, [2, 2, 2, 2]) # 18
+        super().__init__(num_classes=400, use_nl=True) # 50
 
         self.hidden_dim = lstm_hidden_dim
         self.num_layers = lstm_num_layers
@@ -113,64 +47,52 @@ class CLSTM(models.resnet.ResNet):
         self.image_height = 224
         self.class_num = class_num
         if pretrained:
-            self.load_state_dict(models.resnet50(pretrained=True).state_dict())
-            #self.load_state_dict(models.resnet18(pretrained=False).state_dict())
-            #self.load_state_dict(models.resnet101(pretrained=True).state_dict())
+            state_dict = torch.load('third_party/pretrained/i3d_r50_nl_kinetics.pth')
+            self.load_state_dict(state_dict)
+
 
         _dropout = 0.2 #TODO:0.3
-        cnn_out_size = 2048
-        #cnn_out_size = 512 # for resnet18
-        self.lstm = nn.LSTM(cnn_out_size, self.hidden_dim, dropout=_dropout, num_layers=self.num_layers, batch_first=True)
-        
+        self.cnn_out_size = 2048
+
         # linear
-        self.hidden1_fc = nn.Linear(self.hidden_dim, self.hidden_dim // 2)
-        self.hidden2_fc = nn.Linear(self.hidden_dim // 2, self.class_num)
+        self.hidden1_fc = nn.Linear(self.cnn_out_size, self.cnn_out_size // 2)
+        self.hidden2_fc = nn.Linear(self.cnn_out_size // 2, self.class_num)
         # dropout
 
         self.dropout_cnn0 = nn.Dropout(p=_dropout)
         self.dropout_cnn1 = nn.Dropout(p=_dropout)
         self.dropout_cnn2 = nn.Dropout(p=_dropout)
-
+        self.dropout_cnn3 = nn.Dropout(p=_dropout)
         self.dropout_fc = nn.Dropout(p=_dropout)
 
-
-    # https://github.com/HHTseng/video-classification/blob/master/CRNN/functions.py    
     def forward(self, x):
-        # size: batch, len, channel, width, height
-        batch_size, timesteps, C, H, W = x.size()
-        c_in = x.view(batch_size * timesteps, C, H, W)
+        # size: batch, channel, len, width, height
 
-        # ResNet:
-        cnn_x = self.conv1(c_in)
+        x = self.conv1(x)
+        x = self.bn1(x)
+        x = self.relu(x)
+        x = self.maxpool1(x)
 
-        cnn_x = self.bn1(cnn_x)
-        cnn_x = self.relu(cnn_x)
-        cnn_x = self.maxpool(cnn_x)
+        x = self.layer1(x)
+        x = self.maxpool2(x)
+        x = self.dropout_cnn0(x)
+        x = self.layer2(x)
+        x = self.dropout_cnn1(x)
+        x = self.layer3(x)
+        x = self.dropout_cnn2(x)
+        x = self.layer4(x)
 
-        cnn_x = self.layer1(cnn_x)
-        cnn_x = self.dropout_cnn0(cnn_x)
-        cnn_x = self.layer2(cnn_x)
-        cnn_x = self.dropout_cnn1(cnn_x)
-        cnn_x = self.layer3(cnn_x)
-        cnn_x = self.dropout_cnn2(cnn_x)
-        cnn_x = self.layer4(cnn_x)
-        
-        cnn_x = self.avgpool(cnn_x)
-        c_out = torch.flatten(cnn_x, 1) # batch*len, 2048/512
-        lstm_in = c_out.view(batch_size, timesteps, -1)
-        
-        lstm_out, _ = self.lstm(lstm_in)
-        #print(lstm_out.shape)
+        x = self.avgpool(x)
+        x = self.dropout_cnn3(x)
 
-        # linear
-        cnn_lstm_out = self.hidden1_fc(torch.tanh(lstm_out[:,-1,:]))
-        cnn_lstm_out = self.dropout_fc(cnn_lstm_out) # shall we add the dropout in fc?
-        cnn_lstm_out = self.hidden2_fc(torch.tanh(cnn_lstm_out))
-        # output
-        logit = cnn_lstm_out
+        x = x.view(x.shape[0], -1)
+        x = self.hidden1_fc(torch.tanh(x))
+        x = self.dropout_fc(x) # shall we add the dropout in fc?
+        x = self.hidden2_fc(torch.tanh(x))
+        logit = x
         #print(logit.shape)
-        return logit       
-
+        return logit    
+  
 # 测试一下输出的size        
 def test_model():
     model = CLSTM(lstm_hidden_dim = 10, lstm_num_layers = 2, class_num=8)
@@ -203,8 +125,8 @@ def train(model_in, num_epochs = 3, load_model = True, freeze_extractor = True):
     # ============================
 
     # === got model ===
-    save_file = os.path.join('../saved_model', 'CLSTM_50_l10_h512_d02.pth')
-    writer = SummaryWriter('../saved_model/tensorboard_log_50_l10_h512_d02')
+    save_file = os.path.join('../saved_model', 'Resnet3d.pth')
+    writer = SummaryWriter('../saved_model/Resnet3d')
     if(load_model == True):
         model = load_checkpoint(model_in, save_file)
     else:
@@ -242,6 +164,7 @@ def train(model_in, num_epochs = 3, load_model = True, freeze_extractor = True):
 
         for index, (data, target) in enumerate(train_dataloader):
             data, target = data.to(device), target.to(device)
+            data = data.permute(0, 2, 1, 3, 4)
             optimizer.zero_grad()
             output = model(data)
 
@@ -267,6 +190,7 @@ def train(model_in, num_epochs = 3, load_model = True, freeze_extractor = True):
             loss_for_display = 0.0
             for index_eval, (data_eval, target_eval) in enumerate(valid_dataloader):
                 data_eval, target_eval = data_eval.to(device), target_eval.to(device)
+                data_eval = data_eval.permute(0, 2, 1, 3, 4)
                 output_eval = model(data_eval)
                 loss_i = loss_function(output_eval, target_eval).item()
                 loss_for_display += loss_i
@@ -316,14 +240,12 @@ def infer(model_in):
     train_batch_size = 1
     valid_batch_size = 1
     test_batch_size = 1
-    #dataloaders = VSLdataset.create_dataloader_train_valid_test(train_batch_size, valid_batch_size, test_batch_size)
-    dataloaders = VSLdataset.create_dataloader_valid(valid_batch_size)
-
+    dataloaders = VSLdataset.create_dataloader_train_valid_test(train_batch_size, valid_batch_size, test_batch_size)
     valid_dataloader = dataloaders['valid']
     # =============================
 
     # === got model ===
-    save_file = os.path.join('../saved_model', 'CLSTM_50_l10_h512_loss021_best.pth')
+    save_file = os.path.join('../saved_model', 'CLSTM_50_l10_h512_focal.pth')
     model = load_checkpoint(model_in, save_file)
     # =================
     print(model)
@@ -333,8 +255,6 @@ def infer(model_in):
     model.to(device)
     torch.backends.cudnn.benchmark = True
     # =====================
-
-    loss_function = nn.CrossEntropyLoss()
 
     # validation
     class_correct = list(0. for i in range(len(VSLdataset.class_name_to_id_)))
@@ -346,15 +266,11 @@ def infer(model_in):
     all_targets = np.zeros((len(valid_dataloader), 1))
     all_scores = np.zeros((len(valid_dataloader), 8))
     all_predicted_flatten = np.zeros((len(valid_dataloader), 1))
-
-    loss_eval = 0.0
+    
     for index_eval, (data_eval, target_eval) in enumerate(valid_dataloader):
         data_eval, target_eval = data_eval.to(device), target_eval.to(device)
         output_eval = model(data_eval)
-
-        loss_i = loss_function(output_eval, target_eval).item()
-        loss_eval += loss_i
-
+        
         all_targets[index_eval, :] = target_eval[0].cpu().detach().numpy()
         all_scores[index_eval, :] = output_eval[0].cpu().detach().numpy()
              
@@ -378,9 +294,7 @@ def infer(model_in):
         accuracy = 100 * (class_correct[i] + 1) / (class_total[i] + 1)
         print('Accuracy of %5s : %2d %%' % (
             class_name[i], accuracy))
-
-    print('avg_loss: ', loss_eval/len(valid_dataloader))
-
+            
     # === draw roc and confusion mat ===
     evaluate.draw_roc_bin(all_targets, all_scores)
     evaluate.draw_confusion_matrix(all_targets, all_predicted_flatten)
@@ -399,8 +313,8 @@ def visualize_mis_class(frames, saved_name, true_label, false_label): # timestep
             
 if __name__=='__main__':
     #test_model()
-    #model = CLSTM(lstm_hidden_dim = 512, lstm_num_layers = 3, class_num=8)        
-    #train(model_in = model, num_epochs = 100, load_model = False, freeze_extractor = False)
+    model = CLSTM(lstm_hidden_dim = 512, lstm_num_layers = 3, class_num=8)        
+    train(model_in = model, num_epochs = 100, load_model = False, freeze_extractor = False)
 
-    model = CLSTM(lstm_hidden_dim = 512, lstm_num_layers = 3, class_num=8)      
-    infer(model)
+    #model = CLSTM(lstm_hidden_dim = 512, lstm_num_layers = 4, class_num=8)      
+    #infer(model)

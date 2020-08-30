@@ -15,9 +15,8 @@ import sys
 sys.path.append('../')
 
 import os
-import dataloader.VSLdataset_long as VSLdataset
-#import dataloader.VSLdataset as VSLdataset
-
+import dataloader.VSLdataset as VSLdataset
+#import dataloader.VSLdataset_yoloraw as VSLdataset
 import torch.optim as optim
     
 import matplotlib.pyplot as plt
@@ -32,74 +31,45 @@ import evaluate
 """
 
 from torch.autograd import Variable
+class ChannelAttention(nn.Module):
+    def __init__(self, in_planes, ratio=16):
+        super(ChannelAttention, self).__init__()
+        self.avg_pool = nn.AdaptiveAvgPool2d(1)
+        self.max_pool = nn.AdaptiveMaxPool2d(1)
 
-class FocalLoss(nn.Module):
-    r"""
-        This criterion is a implemenation of Focal Loss, which is proposed in 
-        Focal Loss for Dense Object Detection.
+        self.fc1   = nn.Conv2d(in_planes, in_planes // 16, 1, bias=False)
+        self.relu1 = nn.ReLU()
+        self.fc2   = nn.Conv2d(in_planes // 16, in_planes, 1, bias=False)
 
-            Loss(x, class) = - \alpha (1-softmax(x)[class])^gamma \log(softmax(x)[class])
+        self.sigmoid = nn.Sigmoid()
 
-        The losses are averaged across observations for each minibatch.
-
-        Args:
-            alpha(1D Tensor, Variable) : the scalar factor for this criterion
-            gamma(float, double) : gamma > 0; reduces the relative loss for well-classiﬁed examples (p > .5), 
-                                   putting more focus on hard, misclassiﬁed examples
-            size_average(bool): By default, the losses are averaged over observations for each minibatch.
-                                However, if the field size_average is set to False, the losses are
-                                instead summed for each minibatch.
-
-
-    """
-    def __init__(self, class_num, alpha=None, gamma=2, size_average=True):
-        super(FocalLoss, self).__init__()
-        if alpha is None:
-            self.alpha = Variable(torch.ones(class_num, 1))
-        else:
-            if isinstance(alpha, Variable):
-                self.alpha = alpha
-            else:
-                self.alpha = Variable(alpha)
-        self.gamma = gamma
-        self.class_num = class_num
-        self.size_average = size_average
-
-    def forward(self, inputs, targets):
-        N = inputs.size(0)
-        C = inputs.size(1)
-        P = F.softmax(inputs, dim = 1)
-
-        class_mask = inputs.data.new(N, C).fill_(0)
-        class_mask = Variable(class_mask)
-        ids = targets.view(-1, 1)
-        class_mask.scatter_(1, ids.data, 1.)
-        #print(class_mask)
+    def forward(self, x):
+        avg_out = self.fc2(self.relu1(self.fc1(self.avg_pool(x))))
+        max_out = self.fc2(self.relu1(self.fc1(self.max_pool(x))))
+        out = avg_out + max_out
+        return self.sigmoid(out)
 
 
-        if inputs.is_cuda and not self.alpha.is_cuda:
-            self.alpha = self.alpha.cuda()
-        alpha = self.alpha[ids.data.view(-1)]
+class SpatialAttention(nn.Module):
+    def __init__(self, kernel_size=7):
+        super(SpatialAttention, self).__init__()
 
-        probs = (P*class_mask).sum(1).view(-1,1)
+        assert kernel_size in (3, 7), 'kernel size must be 3 or 7'
+        padding = 3 if kernel_size == 7 else 1
 
-        log_p = probs.log()
-        #print('probs size= {}'.format(probs.size()))
-        #print(probs)
+        self.conv1 = nn.Conv2d(2, 1, kernel_size, padding=padding, bias=False)
+        self.sigmoid = nn.Sigmoid()
 
-        batch_loss = -alpha*(torch.pow((1-probs), self.gamma))*log_p 
-        #print('-----bacth_loss------')
-        #print(batch_loss)
-
-
-        if self.size_average:
-            loss = batch_loss.mean()
-        else:
-            loss = batch_loss.sum()
-        return loss
+    def forward(self, x):
+        avg_out = torch.mean(x, dim=1, keepdim=True)
+        max_out, _ = torch.max(x, dim=1, keepdim=True)
+        x = torch.cat([avg_out, max_out], dim=1)
+        x = self.conv1(x)
+        return self.sigmoid(x)
 
 # https://discuss.pytorch.org/t/solved-concatenate-time-distributed-cnn-with-lstm/15435/4
 # https://blog.csdn.net/shanglianlm/article/details/86376627 resnet 用法
+# https://zhuanlan.zhihu.com/p/99261200 attention 用法
 class CLSTM(models.resnet.ResNet):
     def __init__(self, lstm_hidden_dim, lstm_num_layers, class_num, pretrained=True):
         super().__init__(models.resnet.Bottleneck, [3, 4, 6, 3]) # 50
@@ -117,7 +87,14 @@ class CLSTM(models.resnet.ResNet):
             #self.load_state_dict(models.resnet18(pretrained=False).state_dict())
             #self.load_state_dict(models.resnet101(pretrained=True).state_dict())
 
-        _dropout = 0.2 #TODO:0.3
+        # 网络的第一层加入注意力机制
+        self.ca = ChannelAttention(64)
+        self.sa = SpatialAttention()
+        # 网络的卷积层的最后一层加入注意力机制
+        self.ca1 = ChannelAttention(2048)
+        self.sa1 = SpatialAttention()
+
+        _dropout = 0.3 #TODO:0.3
         cnn_out_size = 2048
         #cnn_out_size = 512 # for resnet18
         self.lstm = nn.LSTM(cnn_out_size, self.hidden_dim, dropout=_dropout, num_layers=self.num_layers, batch_first=True)
@@ -142,9 +119,13 @@ class CLSTM(models.resnet.ResNet):
 
         # ResNet:
         cnn_x = self.conv1(c_in)
-
         cnn_x = self.bn1(cnn_x)
         cnn_x = self.relu(cnn_x)
+
+
+        cnn_x = self.ca(cnn_x) * cnn_x # attention begin
+        cnn_x = self.sa(cnn_x) * cnn_x
+
         cnn_x = self.maxpool(cnn_x)
 
         cnn_x = self.layer1(cnn_x)
@@ -155,6 +136,9 @@ class CLSTM(models.resnet.ResNet):
         cnn_x = self.dropout_cnn2(cnn_x)
         cnn_x = self.layer4(cnn_x)
         
+        cnn_x = self.ca1(cnn_x) * cnn_x
+        cnn_x = self.sa1(cnn_x) * cnn_x
+
         cnn_x = self.avgpool(cnn_x)
         c_out = torch.flatten(cnn_x, 1) # batch*len, 2048/512
         lstm_in = c_out.view(batch_size, timesteps, -1)
@@ -203,8 +187,8 @@ def train(model_in, num_epochs = 3, load_model = True, freeze_extractor = True):
     # ============================
 
     # === got model ===
-    save_file = os.path.join('../saved_model', 'CLSTM_50_l10_h512_d02.pth')
-    writer = SummaryWriter('../saved_model/tensorboard_log_50_l10_h512_d02')
+    save_file = os.path.join('../saved_model', 'CLSTM_50_l10_h512_att.pth')
+    writer = SummaryWriter('../saved_model/tensorboard_log_50_l10_h512_att')
     if(load_model == True):
         model = load_checkpoint(model_in, save_file)
     else:
@@ -316,14 +300,12 @@ def infer(model_in):
     train_batch_size = 1
     valid_batch_size = 1
     test_batch_size = 1
-    #dataloaders = VSLdataset.create_dataloader_train_valid_test(train_batch_size, valid_batch_size, test_batch_size)
-    dataloaders = VSLdataset.create_dataloader_valid(valid_batch_size)
-
+    dataloaders = VSLdataset.create_dataloader_train_valid_test(train_batch_size, valid_batch_size, test_batch_size)
     valid_dataloader = dataloaders['valid']
     # =============================
 
     # === got model ===
-    save_file = os.path.join('../saved_model', 'CLSTM_50_l10_h512_loss021_best.pth')
+    save_file = os.path.join('../saved_model', 'CLSTM_50_l10_h512_focal.pth')
     model = load_checkpoint(model_in, save_file)
     # =================
     print(model)
@@ -333,8 +315,6 @@ def infer(model_in):
     model.to(device)
     torch.backends.cudnn.benchmark = True
     # =====================
-
-    loss_function = nn.CrossEntropyLoss()
 
     # validation
     class_correct = list(0. for i in range(len(VSLdataset.class_name_to_id_)))
@@ -346,15 +326,11 @@ def infer(model_in):
     all_targets = np.zeros((len(valid_dataloader), 1))
     all_scores = np.zeros((len(valid_dataloader), 8))
     all_predicted_flatten = np.zeros((len(valid_dataloader), 1))
-
-    loss_eval = 0.0
+    
     for index_eval, (data_eval, target_eval) in enumerate(valid_dataloader):
         data_eval, target_eval = data_eval.to(device), target_eval.to(device)
         output_eval = model(data_eval)
-
-        loss_i = loss_function(output_eval, target_eval).item()
-        loss_eval += loss_i
-
+        
         all_targets[index_eval, :] = target_eval[0].cpu().detach().numpy()
         all_scores[index_eval, :] = output_eval[0].cpu().detach().numpy()
              
@@ -378,9 +354,7 @@ def infer(model_in):
         accuracy = 100 * (class_correct[i] + 1) / (class_total[i] + 1)
         print('Accuracy of %5s : %2d %%' % (
             class_name[i], accuracy))
-
-    print('avg_loss: ', loss_eval/len(valid_dataloader))
-
+            
     # === draw roc and confusion mat ===
     evaluate.draw_roc_bin(all_targets, all_scores)
     evaluate.draw_confusion_matrix(all_targets, all_predicted_flatten)
@@ -399,8 +373,8 @@ def visualize_mis_class(frames, saved_name, true_label, false_label): # timestep
             
 if __name__=='__main__':
     #test_model()
-    #model = CLSTM(lstm_hidden_dim = 512, lstm_num_layers = 3, class_num=8)        
-    #train(model_in = model, num_epochs = 100, load_model = False, freeze_extractor = False)
+    model = CLSTM(lstm_hidden_dim = 512, lstm_num_layers = 3, class_num=8)        
+    train(model_in = model, num_epochs = 100, load_model = False, freeze_extractor = False)
 
-    model = CLSTM(lstm_hidden_dim = 512, lstm_num_layers = 3, class_num=8)      
-    infer(model)
+    #model = CLSTM(lstm_hidden_dim = 512, lstm_num_layers = 4, class_num=8)      
+    #infer(model)
