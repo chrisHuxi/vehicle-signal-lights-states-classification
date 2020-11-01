@@ -140,17 +140,7 @@ class VSLDataSet(Dataset):
                                                                         image5=images[6],
                                                                         image6=images[7],
                                                                         image7=images[8],
-                                                                        image8=images[9],
-                                                                        image9=images[10],
-                                                                        image10=images[11],
-                                                                        image11=images[12],
-                                                                        image12=images[13],
-                                                                        image13=images[14],
-                                                                        image14=images[15],
-                                                                        image15=images[16],
-                                                                        image16=images[17],
-                                                                        image17=images[18],
-                                                                        image18=images[19])
+                                                                        image8=images[9])
                 images_after_transform = []
                 for img_name in augmented.keys():
                     img_after_transform = augmented[img_name]
@@ -273,7 +263,7 @@ def load_dataset_len(root_dir, class_name_to_id, aug_transform_list, imba_transf
                 end_idx.extend([len(paths)])
     end_idx = [0, *end_idx]
     end_idx = torch.cumsum(torch.tensor(end_idx), 0)
-    seq_length = 20 #TODO: 16
+    seq_length = 10 #TODO: 16
 
     sampler = FramesSampler(end_idx, seq_length)
 

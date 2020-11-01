@@ -15,8 +15,8 @@ import sys
 sys.path.append('../')
 
 import os
-import dataloader.VSLdataset_long as VSLdataset
-#import dataloader.VSLdataset as VSLdataset
+#import dataloader.VSLdataset_long as VSLdataset
+import dataloader.VSLdataset as VSLdataset
 
 import torch.optim as optim
     
@@ -316,8 +316,8 @@ def infer(model_in):
     train_batch_size = 1
     valid_batch_size = 1
     test_batch_size = 1
-    #dataloaders = VSLdataset.create_dataloader_train_valid_test(train_batch_size, valid_batch_size, test_batch_size)
-    dataloaders = VSLdataset.create_dataloader_valid(valid_batch_size)
+    dataloaders = VSLdataset.create_dataloader_train_valid_test(train_batch_size, valid_batch_size, test_batch_size)
+    #dataloaders = VSLdataset.create_dataloader_valid(valid_batch_size)
 
     valid_dataloader = dataloaders['valid']
     # =============================
@@ -362,7 +362,7 @@ def infer(model_in):
         all_predicted_flatten[index_eval, :] = predicted[0].cpu().detach().numpy()
         if(predicted != target_eval): # batch_size, timesteps, C, H, W
             print('mis_classified: ', index_eval)
-            visualize_mis_class(data_eval[0].permute(0, 2, 3, 1).cpu(), str(index_eval) + '.png', class_name[target_eval[0].cpu().numpy()], class_name[predicted[0].cpu().numpy()])
+            #visualize_mis_class(data_eval[0].permute(0, 2, 3, 1).cpu(), str(index_eval) + '.png', class_name[target_eval[0].cpu().numpy()], class_name[predicted[0].cpu().numpy()])
         
         c = (predicted == target_eval).squeeze()
         for i in range(valid_batch_size):

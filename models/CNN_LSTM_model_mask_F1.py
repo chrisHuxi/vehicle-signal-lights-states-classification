@@ -17,6 +17,8 @@ sys.path.append('../')
 import os
 #import dataloader.VSLdataset as VSLdataset
 import dataloader.VSLdataset_mask as VSLdataset
+#import dataloader.VSLdataset_cut as VSLdataset
+
 import torch.optim as optim
     
 import matplotlib.pyplot as plt
@@ -330,7 +332,7 @@ def infer(model_in):
     # =============================
 
     # === got model ===
-    save_file = os.path.join('../saved_model', 'CLSTM_50_l10_h512_yolocut.pth')
+    save_file = os.path.join('../saved_model', 'CLSTM_50_l10_h512_yolo_gaussmask_t1.pth')
     model = load_checkpoint(model_in, save_file)
     # =================
     print(model)
