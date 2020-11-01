@@ -16,10 +16,24 @@ import pandas as pd
 import dataloader.VSLdataset as VSLdataset
 import os
 
+# for marco-F1 and micro-F1
+from sklearn.metrics import f1_score
+
+class_name_to_id_ = {
+'OOO':0,
+'BOO':1,
+'OLO':2,
+'OOR':3,
+'BLO':4,
+'BOR':5,
+'OLR':6,
+'BLR':7
+}
+
 # https://scikit-learn.org/stable/auto_examples/model_selection/plot_roc.html
 def draw_roc_bin(y_label, y_predicted):
     n_classes = 8
-    class_list = list(VSLdataset.class_name_to_id_)
+    class_list = list(class_name_to_id_)
 
     # Compute ROC curve and ROC area for each class
     fpr = dict()
@@ -97,7 +111,8 @@ def draw_roc_bin(y_label, y_predicted):
 # https://stackoverflow.com/questions/35572000/how-can-i-plot-a-confusion-matrix
 def draw_confusion_matrix(y_label, y_predicted_flatten):
     class_list = list(VSLdataset.class_name_to_id_)
-    cm = confusion_matrix(y_label, y_predicted_flatten)
+    cm = confusion_matrix(y_label, y_predicted_flatten, normalize='true')
+    cm = np.around(cm, decimals=2)
     df_cm = pd.DataFrame(cm,  index=[ class_list[i] for i in range(8) ], columns=[ class_list[i] for i in range(8)] )
     plt.figure(figsize=(10,7))
     sn.set(font_scale=1.4) # for label size
@@ -106,5 +121,13 @@ def draw_confusion_matrix(y_label, y_predicted_flatten):
     plt.savefig(save_file)
 
     
+# calculate Macro F1 and Micro F1
+def calculate_f1(y_label, y_predicted_flatten):
+    macro_f1 = f1_score(y_label, y_predicted_flatten, average='macro')
+    micro_f1 = f1_score(y_label, y_predicted_flatten, average='micro')
+    print("macro_f1, micro_f1")
+    print(macro_f1, micro_f1)
+
+
     
     
