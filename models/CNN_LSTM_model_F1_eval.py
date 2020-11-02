@@ -15,8 +15,8 @@ import sys
 sys.path.append('../')
 
 import os
-import dataloader.VSLdataset_long as VSLdataset
-#import dataloader.VSLdataset_short as VSLdataset
+#import dataloader.VSLdataset_long as VSLdataset
+import dataloader.VSLdataset_short as VSLdataset
 #import dataloader.VSLdataset as VSLdataset
 
 import torch.optim as optim
@@ -38,7 +38,7 @@ from torch.autograd import Variable
 # https://discuss.pytorch.org/t/solved-concatenate-time-distributed-cnn-with-lstm/15435/4
 # https://blog.csdn.net/shanglianlm/article/details/86376627 resnet 用法
 class CLSTM(models.resnet.ResNet):
-    def __init__(self, lstm_hidden_dim, lstm_num_layers, class_num, pretrained=True):
+    def __init__(self, lstm_hidden_dim, lstm_num_layers, class_num, pretrained=False):
         super().__init__(models.resnet.Bottleneck, [3, 4, 6, 3]) # 50
 
         self.hidden_dim = lstm_hidden_dim
@@ -79,7 +79,7 @@ class CLSTM(models.resnet.ResNet):
         cnn_x = self.bn1(cnn_x)
         cnn_x = self.relu(cnn_x)
         cnn_x = self.maxpool(cnn_x)
-        cnn_conv_f1 = cnn_x
+        #cnn_conv_f1 = cnn_x
 
         cnn_x = self.layer1(cnn_x)
 
@@ -106,7 +106,7 @@ class CLSTM(models.resnet.ResNet):
         # output
         logit = cnn_lstm_out
         #print(logit.shape)
-        return logit, cnn_conv_f1       
+        return logit  
 
 
 def load_checkpoint(model, checkpoint_PATH):
@@ -127,6 +127,8 @@ def save_img(tensor, name):
     Image.fromarray(im).save(name + '.jpg')
 
 def infer(model_in):
+    import time
+
     # === dataloader defination ===
     train_batch_size = 1
     valid_batch_size = 1
@@ -141,7 +143,12 @@ def infer(model_in):
     save_file = os.path.join('../saved_model', 'CLSTM_50_l10_h512_loss021_best.pth')
     model = load_checkpoint(model_in, save_file)
     # =================
+
     print(model)
+    pytorch_total_params = sum(p.numel() for p in model.parameters())
+    print("parameter number:")
+    print(pytorch_total_params)
+
 
     # === runing no gpu ===
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
@@ -163,10 +170,19 @@ def infer(model_in):
     all_predicted_flatten = np.zeros((len(valid_dataloader), 1))
 
     loss_eval = 0.0
+    mean_runtime = 0
+
     for index_eval, (data_eval, target_eval) in enumerate(valid_dataloader):
         data_eval, target_eval = data_eval.to(device), target_eval.to(device)
-        output_eval, cnn_conv_f1 = model(data_eval)
-        
+
+        torch.cuda.current_stream().synchronize()
+        start_time = time.time()
+        output_eval = model(data_eval)
+        torch.cuda.current_stream().synchronize()
+        end_time = time.time()
+        print("--- %s seconds --- normal" % (time.time() - start_time))
+        mean_runtime += end_time - start_time
+
         loss_i = loss_function(output_eval, target_eval).item()
         loss_eval += loss_i
 
@@ -199,6 +215,8 @@ def infer(model_in):
             class_name[i], accuracy))
 
     print('avg_loss: ', loss_eval/len(valid_dataloader))
+
+    print(mean_runtime/index_eval)
 
     evaluate.calculate_f1(all_targets, all_predicted_flatten)
             

@@ -162,13 +162,21 @@ def infer_normal(model_in):
         try:
             for index_eval, (data_eval, frame_id_eval) in enumerate(infer_dataloader):
                 data_eval = data_eval.to(device)
+
                 torch.cuda.current_stream().synchronize()
                 start_time = time.time()
                 output_eval = model(data_eval)
                 torch.cuda.current_stream().synchronize()
+
                 end_time = time.time()
-                print("--- %s seconds --- normal" % (end_time - start_time))
+                print("--- %s seconds --- normal" % (time.time() - start_time))
+
                 mean_runtime += end_time - start_time
+
+                print(torch.cuda.memory_cached(0)/(1024.0*1024))
+                print(torch.cuda.memory_allocated(0)/(1024.0*1024))
+
+
                 _, predicted = torch.max(output_eval, 1)
                 print_list.append([str(frame_id_eval[0]), class_name[predicted[0]]])
         except:
@@ -188,7 +196,7 @@ def load_trt_model_and_infer(model_in, file_name, fp16 = False, int8 = False):
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     print(device)
     model = model_in.eval().cuda()
-    data_example = torch.randn(8, 10, 3, 224, 224)
+    data_example = torch.randn(1, 10, 3, 224, 224)
     data_example = data_example.to(device)
 
     model_trt = torch2trt(model_in, [data_example], max_workspace_size=1<<26,fp16_mode = fp16, int8_mode = int8)
@@ -222,6 +230,11 @@ def load_trt_model_and_infer(model_in, file_name, fp16 = False, int8 = False):
                 end_time = time.time()
                 print("--- %s seconds --- trt" % (end_time - start_time))
                 mean_runtime += end_time - start_time
+
+                print(torch.cuda.memory_cached(0)/(1024.0*1024))
+                print(torch.cuda.memory_allocated(0)/(1024.0*1024))
+
+
                 _, predicted_trt = torch.max(output_eval_trt, 1)
                 print_list.append([str(frame_id_eval[0]), class_name[predicted_trt[0]]])
         except:
@@ -258,9 +271,9 @@ if __name__=='__main__':
 
     model = CLSTM(lstm_hidden_dim = 512, lstm_num_layers = 3, class_num=8) 
     #save_model_trt(model, 'test_trt_int8.pth', fp16 = False, int8 = True)     
-    infer_normal(model)
+    #infer_normal(model)
     #resnet_test()
-    #load_trt_model_and_infer(model, 'test_trt_fp32.pth', fp16 = False, int8 = False)
+    load_trt_model_and_infer(model, 'test_trt_fp32.pth', fp16 = True, int8 = False)
 
 
 
