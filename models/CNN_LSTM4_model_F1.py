@@ -15,7 +15,8 @@ import sys
 sys.path.append('../')
 
 import os
-import dataloader.VSLdataset_short as VSLdataset
+#import dataloader.VSLdataset_long as VSLdataset
+import dataloader.VSLdataset as VSLdataset
 
 import torch.optim as optim
     
@@ -24,34 +25,70 @@ import matplotlib.pyplot as plt
 from torch.utils.tensorboard import SummaryWriter    
 
 import evaluate
+
 """
     Neural Network: CNN_LSTM
     Detail: the input crosss cnn model and LSTM model independly, then the result of both concat
 """
 '''
-Accuracy of   OOO : 100 %
-Accuracy of   BOO : 76 %
-Accuracy of   OLO : 77 %
-Accuracy of   BLO : 74 %
-Accuracy of   OOR : 92 %
+[6,  2370] loss: 0.227
+F1:
+macro_f1, micro_f1
+0.8740899796625927 0.8968855218855218
+Accuracy of   OOO : 97 %
+Accuracy of   BOO : 65 %
+Accuracy of   OLO : 93 %
+Accuracy of   BLO : 83 %
+Accuracy of   OOR : 85 %
 Accuracy of   BOR : 93 %
+Accuracy of   OLR : 88 %
+Accuracy of   BLR : 100 %
+88%
+avg_loss:  0.3739648837633807
+
+[6,  2370] loss: 0.911
+F1:
+macro_f1, micro_f1
+0.8878546634041531 0.9040404040404041
+Accuracy of   OOO : 95 %
+Accuracy of   BOO : 76 %
+Accuracy of   OLO : 89 %
+Accuracy of   BLO : 68 %
+Accuracy of   OOR : 91 %
+Accuracy of   BOR : 97 %
+Accuracy of   OLR : 98 %
+Accuracy of   BLR : 100 %
+avg_loss:  0.32942014922597995
+89.25%
+
+[5,  2370] loss: 0.600
+F1:
+macro_f1, micro_f1
+0.8701192666019357 0.8964646464646465
+Accuracy of   OOO : 95 %
+Accuracy of   BOO : 83 %
+Accuracy of   OLO : 92 %
+Accuracy of   BLO : 77 %
+Accuracy of   OOR : 84 %
+Accuracy of   BOR : 78 %
 Accuracy of   OLR : 99 %
 Accuracy of   BLR : 100 %
-avg_loss:  0.8530571035263113
-mean runtime:
-0.12882715697037547
-macro_f1, micro_f1
-0.8853492037303271 0.8804713804713805
+avg_loss:  0.2911147099452388
+88.5
 
 '''
 
+
+from torch.autograd import Variable
+
+
 # https://discuss.pytorch.org/t/solved-concatenate-time-distributed-cnn-with-lstm/15435/4
-# https://blog.csdn.net/shanglianlm/article/details/86376627 resnet
+# https://blog.csdn.net/shanglianlm/article/details/86376627 resnet 用法
 class CLSTM(models.resnet.ResNet):
-    def __init__(self, lstm_hidden_dim, lstm_num_layers, class_num, pretrained=False):
-        #super().__init__(models.resnet.Bottleneck, [3, 4, 6, 3]) # 50
+    def __init__(self, lstm_hidden_dim, lstm_num_layers, class_num, pretrained=True):
+        super().__init__(models.resnet.Bottleneck, [3, 4, 6, 3]) # 50
         #super().__init__(models.resnet.Bottleneck, [3, 4, 23, 3]) # 101
-        super().__init__(models.resnet.Bottleneck, [3, 8, 36, 3]) # 152
+        
         #super().__init__(models.resnet.BasicBlock, [2, 2, 2, 2]) # 18
 
         self.hidden_dim = lstm_hidden_dim
@@ -60,12 +97,11 @@ class CLSTM(models.resnet.ResNet):
         self.image_height = 224
         self.class_num = class_num
         if pretrained:
-            #self.load_state_dict(models.resnet50(pretrained=True).state_dict())
+            self.load_state_dict(models.resnet50(pretrained=True).state_dict())
             #self.load_state_dict(models.resnet18(pretrained=False).state_dict())
             #self.load_state_dict(models.resnet101(pretrained=True).state_dict())
-            self.load_state_dict(models.resnet152(pretrained=True).state_dict())
 
-        _dropout = 0.3 #TODO:0.3
+        _dropout = 0.2 #TODO:0.3
         cnn_out_size = 2048
         #cnn_out_size = 512 # for resnet18
         self.lstm = nn.LSTM(cnn_out_size, self.hidden_dim, dropout=_dropout, num_layers=self.num_layers, batch_first=True)
@@ -118,7 +154,8 @@ class CLSTM(models.resnet.ResNet):
         logit = cnn_lstm_out
         #print(logit.shape)
         return logit       
-  
+
+# 测试一下输出的size        
 def test_model():
     model = CLSTM(lstm_hidden_dim = 10, lstm_num_layers = 2, class_num=8)
     #batch, len, channel, width, height
@@ -135,7 +172,7 @@ def load_checkpoint(model, checkpoint_PATH):
     
 def train(model_in, num_epochs = 3, load_model = True, freeze_extractor = True):
     # === dataloader defination ===
-    train_batch_size = 8
+    train_batch_size = 2
     valid_batch_size = 1
     test_batch_size = 1
     dataloaders = VSLdataset.create_dataloader_train_valid_test(train_batch_size, valid_batch_size, test_batch_size)
@@ -150,8 +187,8 @@ def train(model_in, num_epochs = 3, load_model = True, freeze_extractor = True):
     # ============================
 
     # === got model ===
-    save_file = os.path.join('../saved_model', 'CLSTM_152_l10_h512.pth')
-    writer = SummaryWriter('../saved_model/tensorboard_log_152_l10_h512')
+    save_file = os.path.join('../saved_model', 'CLSTM_50_l10_h512layer4_d02.pth')
+    writer = SummaryWriter('../saved_model/tensorboard_log_50_l10_h512layer4_d02')
     if(load_model == True):
         model = load_checkpoint(model_in, save_file)
     else:
@@ -175,7 +212,6 @@ def train(model_in, num_epochs = 3, load_model = True, freeze_extractor = True):
 
     # === runing no gpu ===
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-    print(device)
     model.to(device)
     torch.backends.cudnn.benchmark = True
     # =====================
@@ -196,10 +232,10 @@ def train(model_in, num_epochs = 3, load_model = True, freeze_extractor = True):
             loss.backward()
             optimizer.step()
             train_loss += loss.item()
-            if index % 10  == 9:    # print every 10 mini-batches
+            if index % 100  == 99:    # print every 10 mini-batches
                 print('[%d, %5d] loss: %.3f' %
-                      (epoch + 1, index + 1, train_loss / 10))
-                writer.add_scalar('Train/Loss', train_loss / 10, epoch * (len(train_dataloader)) + index + 1)
+                      (epoch + 1, index + 1, train_loss / 100))
+                writer.add_scalar('Train/Loss', train_loss / 100, epoch * (len(train_dataloader)) + index + 1)
                 writer.flush()
                 train_loss = 0.0
 
@@ -212,6 +248,10 @@ def train(model_in, num_epochs = 3, load_model = True, freeze_extractor = True):
             print('Valid:')
             loss_eval = 0.0
             loss_for_display = 0.0
+
+            all_targets = np.zeros((len(valid_dataloader), 1))
+            all_predicted_flatten = np.zeros((len(valid_dataloader), 1))
+
             for index_eval, (data_eval, target_eval) in enumerate(valid_dataloader):
                 data_eval, target_eval = data_eval.to(device), target_eval.to(device)
                 output_eval = model(data_eval)
@@ -219,7 +259,9 @@ def train(model_in, num_epochs = 3, load_model = True, freeze_extractor = True):
                 loss_for_display += loss_i
                 loss_eval += loss_i
                 
+                all_targets[index_eval, :] = target_eval[0].cpu().detach().numpy()
                 _, predicted = torch.max(output_eval, 1)
+                all_predicted_flatten[index_eval, :] = predicted[0].cpu().detach().numpy()
 
                 c = (predicted == target_eval).squeeze()
                 for i in range(valid_batch_size):
@@ -235,6 +277,9 @@ def train(model_in, num_epochs = 3, load_model = True, freeze_extractor = True):
                           (epoch + 1, index_eval + 1, loss_for_display / 10))
                     loss_for_display = 0.0
 
+            print("F1:")
+            evaluate.calculate_f1(all_targets, all_predicted_flatten)
+
             for i in range(len(VSLdataset.class_name_to_id_)):
                 accuracy = 100 * (class_correct[i] + 1) / (class_total[i] + 1)
                 print('Accuracy of %5s : %2d %%' % (
@@ -248,6 +293,7 @@ def train(model_in, num_epochs = 3, load_model = True, freeze_extractor = True):
             writer.flush()
             loss_eval = 0.0
 
+            # 每次 eval 都进行保存
             # save current model
             torch.save({
                 'model_state_dict': model.state_dict(),
@@ -257,30 +303,22 @@ def train(model_in, num_epochs = 3, load_model = True, freeze_extractor = True):
             }, save_file)
             print("saved model.")
 
-
 def infer(model_in):
-
-    import time
-
     # === dataloader defination ===
     train_batch_size = 1
     valid_batch_size = 1
     test_batch_size = 1
-    dataloaders = VSLdataset.create_dataloader_valid(valid_batch_size)
+    dataloaders = VSLdataset.create_dataloader_train_valid_test(train_batch_size, valid_batch_size, test_batch_size)
+    #dataloaders = VSLdataset.create_dataloader_valid(valid_batch_size)
 
     valid_dataloader = dataloaders['valid']
     # =============================
 
     # === got model ===
-    save_file = os.path.join('../saved_model', 'CLSTM_152_l10_h512.pth')
+    save_file = os.path.join('../saved_model', 'CLSTM_50_l10_h512_loss021_best.pth')
     model = load_checkpoint(model_in, save_file)
     # =================
-
     print(model)
-    pytorch_total_params = sum(p.numel() for p in model.parameters())
-    print("parameter number:")
-    print(pytorch_total_params)
-
 
     # === runing no gpu ===
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
@@ -302,20 +340,9 @@ def infer(model_in):
     all_predicted_flatten = np.zeros((len(valid_dataloader), 1))
 
     loss_eval = 0.0
-    mean_runtime = 0
     for index_eval, (data_eval, target_eval) in enumerate(valid_dataloader):
         data_eval, target_eval = data_eval.to(device), target_eval.to(device)
-
-        torch.cuda.current_stream().synchronize()
-        start_time = time.time()
         output_eval = model(data_eval)
-        torch.cuda.current_stream().synchronize()
-        end_time = time.time()
-        print("--- %s seconds --- normal" % (end_time - start_time))
-        mean_runtime += end_time - start_time
-
-        print(torch.cuda.memory_cached(0)/(1024.0*1024))
-        print(torch.cuda.memory_allocated(0)/(1024.0*1024))
 
         loss_i = loss_function(output_eval, target_eval).item()
         loss_eval += loss_i
@@ -325,13 +352,9 @@ def infer(model_in):
              
         _, predicted = torch.max(output_eval, 1)
         all_predicted_flatten[index_eval, :] = predicted[0].cpu().detach().numpy()
-
-        print('label:')
-        print(class_name[target_eval[0]])
-
-        print('predicted:')
-        print(class_name[predicted[0]])
-
+        if(predicted != target_eval): # batch_size, timesteps, C, H, W
+            print('mis_classified: ', index_eval)
+            #visualize_mis_class(data_eval[0].permute(0, 2, 3, 1).cpu(), str(index_eval) + '.png', class_name[target_eval[0].cpu().numpy()], class_name[predicted[0].cpu().numpy()])
         
         c = (predicted == target_eval).squeeze()
         for i in range(valid_batch_size):
@@ -349,15 +372,27 @@ def infer(model_in):
             class_name[i], accuracy))
 
     print('avg_loss: ', loss_eval/len(valid_dataloader))
-    print("mean runtime:")
-    print(mean_runtime/index_eval)
-    evaluate.calculate_f1(all_targets, all_predicted_flatten)
+
+    # === draw roc and confusion mat ===
+    evaluate.draw_roc_bin(all_targets, all_scores)
+    evaluate.draw_confusion_matrix(all_targets, all_predicted_flatten)
+    # === draw roc and confusion mat end ===
             
+def visualize_mis_class(frames, saved_name, true_label, false_label): # timesteps, C, H, W
+    fig=plt.figure(figsize=(10, 6))
+    fig.suptitle('GT: ' + true_label+'   Predicted:'+false_label)
+    for i in range(10):
+        fig.add_subplot(2,5,i+1) 
+        plt.imshow(frames[i])
+    save_file = os.path.join('../mis_classified', saved_name)
+    plt.savefig(save_file)
+    plt.close('all')
+
             
 if __name__=='__main__':
     #test_model()
-    #model = CLSTM(lstm_hidden_dim = 512, lstm_num_layers = 3, class_num=8)        
-    #train(model_in = model, num_epochs = 100, load_model = False, freeze_extractor = False)
+    model = CLSTM(lstm_hidden_dim = 512, lstm_num_layers = 4, class_num=8)        
+    train(model_in = model, num_epochs = 10, load_model = False, freeze_extractor = False)
 
-    model = CLSTM(lstm_hidden_dim = 512, lstm_num_layers = 3, class_num=8)      
-    infer(model)
+    #model = CLSTM(lstm_hidden_dim = 512, lstm_num_layers = 4, class_num=8)      
+    #infer(model)

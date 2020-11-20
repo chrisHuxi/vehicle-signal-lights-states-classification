@@ -181,10 +181,10 @@ def train(model_in, num_epochs = 3, load_model = True, freeze_extractor = True):
             loss.backward()
             optimizer.step()
             train_loss += loss.item()
-            if index % 10  == 9:    # print every 10 mini-batches
+            if index % 500  == 499:    # print every 10 mini-batches
                 print('[%d, %5d] loss: %.3f' %
-                      (epoch + 1, index + 1, train_loss / 10))
-                writer.add_scalar('Train/Loss', train_loss / 10, epoch * (len(train_dataloader)) + index + 1)
+                      (epoch + 1, index + 1, train_loss / 500))
+                writer.add_scalar('Train/Loss', train_loss / 500, epoch * (len(train_dataloader)) + index + 1)
                 writer.flush()
                 train_loss = 0.0
 
@@ -332,7 +332,7 @@ def visualize_mis_class(frames, saved_name, true_label, false_label): # timestep
 if __name__=='__main__':
     #test_model()
     model = CLSTM(lstm_hidden_dim = 512, lstm_num_layers = 3, class_num=8)        
-    train(model_in = model, num_epochs = 100, load_model = False, freeze_extractor = False)
+    train(model_in = model, num_epochs = 10, load_model = False, freeze_extractor = False)
 
     #model = CLSTM(lstm_hidden_dim = 512, lstm_num_layers = 3, class_num=8)      
     #infer(model)

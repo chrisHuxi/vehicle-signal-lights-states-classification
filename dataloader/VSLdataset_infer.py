@@ -111,7 +111,7 @@ def load_dataset_infer(root_dir, aug_transform_list, track_folder_name):
 
     end_idx = torch.cumsum(torch.tensor(end_idx), 0)
 
-    seq_length = 25 #TODO: 16
+    seq_length = 10 #TODO: 16
 
 
     dataset = VSLDataSet(

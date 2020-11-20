@@ -15,8 +15,8 @@ import sys
 sys.path.append('../')
 
 import os
-import dataloader.VSLdataset_short as VSLdataset
-#import dataloader.VSLdataset as VSLdataset
+#import dataloader.VSLdataset_short as VSLdataset
+import dataloader.VSLdataset as VSLdataset
 
 import torch.optim as optim
     
@@ -30,6 +30,23 @@ import evaluate
     Neural Network: CNN_LSTM
     Detail: the input crosss cnn model and LSTM model independly, then the result of both concat
 """
+'''
+epoch 3
+F1:
+macro_f1, micro_f1
+0.8270268579831794 0.8615319865319865
+Accuracy of   OOO : 93 %
+Accuracy of   BOO : 49 %
+Accuracy of   OLO : 92 %
+Accuracy of   BLO : 60 %
+Accuracy of   OOR : 80 %
+Accuracy of   BOR : 95 %
+Accuracy of   OLR : 94 %
+Accuracy of   BLR : 100 %
+82.875%
+avg_loss:  0.5136758564196853
+'''
+
 # https://discuss.pytorch.org/t/solved-concatenate-time-distributed-cnn-with-lstm/15435/4
 # https://blog.csdn.net/shanglianlm/article/details/86376627 resnet 用法
 class CLSTM(models.resnet.ResNet):
@@ -172,6 +189,8 @@ def train(model_in, num_epochs = 3, load_model = True, freeze_extractor = True):
         train_loss  = 0.0
         print('Train:')
 
+
+
         for index, (data, target) in enumerate(train_dataloader):
             data, target = data.to(device), target.to(device)
             optimizer.zero_grad()
@@ -197,6 +216,11 @@ def train(model_in, num_epochs = 3, load_model = True, freeze_extractor = True):
             print('Valid:')
             loss_eval = 0.0
             loss_for_display = 0.0
+
+
+            all_targets = np.zeros((len(valid_dataloader), 1))
+            all_predicted_flatten = np.zeros((len(valid_dataloader), 1))
+
             for index_eval, (data_eval, target_eval) in enumerate(valid_dataloader):
                 data_eval, target_eval = data_eval.to(device), target_eval.to(device)
                 output_eval = model(data_eval)
@@ -204,7 +228,11 @@ def train(model_in, num_epochs = 3, load_model = True, freeze_extractor = True):
                 loss_for_display += loss_i
                 loss_eval += loss_i
                 
+                all_targets[index_eval, :] = target_eval[0].cpu().detach().numpy()
+
                 _, predicted = torch.max(output_eval, 1)
+                all_predicted_flatten[index_eval, :] = predicted[0].cpu().detach().numpy()
+
 
                 c = (predicted == target_eval).squeeze()
                 for i in range(valid_batch_size):
@@ -220,6 +248,11 @@ def train(model_in, num_epochs = 3, load_model = True, freeze_extractor = True):
                           (epoch + 1, index_eval + 1, loss_for_display / 10))
                     loss_for_display = 0.0
 
+
+            print("F1:")
+            evaluate.calculate_f1(all_targets, all_predicted_flatten)
+
+
             for i in range(len(VSLdataset.class_name_to_id_)):
                 accuracy = 100 * (class_correct[i] + 1) / (class_total[i] + 1)
                 print('Accuracy of %5s : %2d %%' % (
@@ -228,6 +261,9 @@ def train(model_in, num_epochs = 3, load_model = True, freeze_extractor = True):
                 writer.add_scalar('Valid/Accuracy ' + str(class_name[i]), accuracy, epoch)
                 writer.flush()
             print('avg_loss: ', loss_eval/len(valid_dataloader))
+
+
+
             scheduler.step(loss_eval/len(valid_dataloader))
             writer.add_scalar('Valid/Loss ', loss_eval/len(valid_dataloader), epoch)
             writer.flush()
@@ -333,8 +369,8 @@ def visualize_mis_class(frames, saved_name, true_label, false_label): # timestep
             
 if __name__=='__main__':
     #test_model()
-    #model = CLSTM(lstm_hidden_dim = 512, lstm_num_layers = 3, class_num=8)        
-    #train(model_in = model, num_epochs = 100, load_model = False, freeze_extractor = False)
+    model = CLSTM(lstm_hidden_dim = 512, lstm_num_layers = 3, class_num=8)        
+    train(model_in = model, num_epochs = 10, load_model = False, freeze_extractor = False)
 
-    model = CLSTM(lstm_hidden_dim = 512, lstm_num_layers = 3, class_num=8)      
-    infer(model)
+    #model = CLSTM(lstm_hidden_dim = 512, lstm_num_layers = 3, class_num=8)      
+    #infer(model)

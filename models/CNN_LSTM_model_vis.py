@@ -212,8 +212,8 @@ def infer(model_in):
     print('avg_loss: ', loss_eval/len(valid_dataloader))
 
     # === draw roc and confusion mat ===
-    evaluate.draw_roc_bin(all_targets, all_scores)
-    evaluate.draw_confusion_matrix(all_targets, all_predicted_flatten)
+    #evaluate.draw_roc_bin(all_targets, all_scores)
+    #evaluate.draw_confusion_matrix(all_targets, all_predicted_flatten)
     # === draw roc and confusion mat end ===
             
 def visualize_mis_class(frames, saved_name, true_label, false_label): # timesteps, C, H, W
