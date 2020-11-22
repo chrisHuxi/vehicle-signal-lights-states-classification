@@ -37,11 +37,18 @@ We choose a model with best performance: ResNet50-LSTM3 and find that when a lon
 #### Confusion matrix:
 
 left figure is the confusion matrix of model inferring with 10 frames while right figure is with 20 frames.
+
+
 <div align=center> <img src="https://github.com/chrisHuxi/vehicle-signal-lights-states-classification/blob/master/readme/evluation/cofusion_matrix_todo.png" alt="drawing" width="700"/>
+ 
+ 
  
 #### ROC curve:
 left figure is the roc curve of model inferring with 10 frames while right figure is with 20 frames.
+
+
 <div align=center> <img src="https://github.com/chrisHuxi/vehicle-signal-lights-states-classification/blob/master/readme/evluation/ROC_len10_len20.png" alt="drawing" width="700"/>
+
 
 ## Dataset:
 To train a neural network, a significant role is the dataset. For vehicle signal lights states classification, we have two types of datasets to use, which we call the "end-to-end method dataset" for directly classifying states from frames and the "detection-based method dataset" for detecting the lights' bounding box first.
@@ -49,10 +56,14 @@ To train a neural network, a significant role is the dataset. For vehicle signal
 ### The end-to-end method dataset
 We used a public dataset: [**link**](), some examples of each class is shown:
 
+
 <div align=center> <img src="https://github.com/chrisHuxi/vehicle-signal-lights-states-classification/blob/master/readme/evluation/dataset.png" alt="drawing" width="500"/>
+
 
 ### The detection-based method dataset
 We labeled 715 images with bbox of lights: [**link**](), some examples of each class is shown:
+
+
 <div align=center> <img src="https://github.com/chrisHuxi/vehicle-signal-lights-states-classification/blob/master/readme/evluation/dataset_detection.png" alt="drawing" width="500"/>
 
 
