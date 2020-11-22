@@ -1,10 +1,9 @@
-# vehicle-signal-lights-states-classification
 [![Project from BMW](https://github.com/chrisHuxi/Trajectory_Predictor/blob/master/readme_images/Absolut.jpeg)](https://absolut-projekt.de/)
 
 [![Project from TUD](https://img.shields.io/badge/TU%20dresden-Computer%20Science-blue)](https://tu-dresden.de/ing/informatik)
 
 
-# Trajectory Predictor
+# vehicle signal lights states classification
 TUD master thesis project, vehicle signal lights states classification based on video clips, pytorch.
 
 ## Intro:
@@ -12,3 +11,14 @@ This thesis aims to solve the state classification problem of daytime vehicle si
 
 ## Dataset:
 To train a neural network, a significant role is the dataset. For vehicle signal lights states classification, we have two types of datasets to use, which we call the "end-to-end method dataset" for directly classifying states from frames and the "detection-based method dataset" for detecting the lights' bounding box first.
+
+### The end-to-end method dataset
+We used a public dataset: [**link**](), some examples of each class is shown:
+
+<div align=center> <img src="https://github.com/chrisHuxi/vehicle-signal-lights-states-classification/blob/master/readme/evluation/dataset.png> </div>
+
+### The detection-based method dataset
+We labeled 715 images with bbox of lights, some examples of each class is shown:
+
+
+<div align=center> <img src="https://github.com/chrisHuxi/vehicle-signal-lights-states-classification/blob/master/readme/evluation/dataset_detection.png> </div>
