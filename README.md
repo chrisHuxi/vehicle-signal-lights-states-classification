@@ -44,7 +44,7 @@ We choose a model with best performance: ResNet50-LSTM3 and find that when a lon
 left figure is the confusion matrix of model inferring with 10 frames while right figure is with 20 frames.
 
 
-<div align=center> <img src="https://github.com/chrisHuxi/vehicle-signal-lights-states-classification/blob/master/readme/evluation/cofusion_matrix_todo.png" alt="drawing" width="700"/>
+<div align=center> <img src="https://github.com/chrisHuxi/vehicle-signal-lights-states-classification/blob/master/readme/evluation/cofusion_matrix_todo.png" alt="drawing" width="700"/> </div>
  
  
  
@@ -52,7 +52,7 @@ left figure is the confusion matrix of model inferring with 10 frames while righ
 left figure is the roc curve of model inferring with 10 frames while right figure is with 20 frames.
 
 
-<div align=center> <img src="https://github.com/chrisHuxi/vehicle-signal-lights-states-classification/blob/master/readme/evluation/ROC_len10_len20.png" alt="drawing" width="700"/>
+<div align=center> <img src="https://github.com/chrisHuxi/vehicle-signal-lights-states-classification/blob/master/readme/evluation/ROC_len10_len20.png" alt="drawing" width="700"/> </div>
 
 
 ## Dataset:
@@ -62,14 +62,14 @@ To train a neural network, a significant role is the dataset. For vehicle signal
 We used a public dataset: [**link**](), some examples of each class is shown:
 
 
-<div align=center> <img src="https://github.com/chrisHuxi/vehicle-signal-lights-states-classification/blob/master/readme/evluation/dataset.png" alt="drawing" width="500"/>
+<div align=center> <img src="https://github.com/chrisHuxi/vehicle-signal-lights-states-classification/blob/master/readme/evluation/dataset.png" alt="drawing" width="500"/> </div>
 
 
 ### The detection-based method dataset
 We labeled 715 images with bbox of lights: [**link**](), some examples of each class is shown:
 
 
-<div align=center> <img src="https://github.com/chrisHuxi/vehicle-signal-lights-states-classification/blob/master/readme/evluation/dataset_detection.png" alt="drawing" width="500"/>
+<div align=center> <img src="https://github.com/chrisHuxi/vehicle-signal-lights-states-classification/blob/master/readme/evluation/dataset_detection.png" alt="drawing" width="500"/> </div>
 
 
 ## Usage:
