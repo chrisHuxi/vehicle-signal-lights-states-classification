@@ -24,6 +24,94 @@ This thesis aims to solve the state classification problem of daytime vehicle si
  
  <div align=center> <img src="https://github.com/chrisHuxi/vehicle-signal-lights-states-classification/blob/master/readme/evluation/proposed_model/YOLO-ResNet-LSTM.png" alt="drawing" width="500"/> </div>
   
+## Usage:
+
+### Config enviroment:
+  ```bash
+  python3 -m venv /path/to/your/virtual/env
+  source /path/to/your/virtual/env
+  pip install requirements.txt
+  ```
+
+### Train model:
+
+#### ResNet-LSTM model:
+The most important code file are the dataloader/VSLdataset.py, models/CNN_LSTM_model_resnet50.py and models/CNN_LSTM_model_infer_RT.py.
+And you have to make sure your dataset structure looks like this:
+```bash
+train/
+    - BOO/
+        -clip1/
+            -frame00.png
+            -frame01.png
+            - ...
+        -clip2
+            - frame00.png
+            - frame01.png
+            - ...
+    - BLO
+        -clip3/
+            -frame00.png
+            -frame01.png
+            - ...
+        -clip4
+            - frame00.png
+            - frame01.png
+    - ... 
+  valid/
+      - BOO/
+      -...
+  test/
+      - BOO/
+      -...   
+  ```
+  
+  Then you can start training by run script:
+  ```bash
+  python models/CNN_LSTM_model_resnet50.py
+  ```
+  where mainly includes 2 step: 1. create model 2. training model
+  ```python
+  model = CLSTM(lstm_hidden_dim = 512, lstm_num_layers = 3, class_num=8)        
+  train(model_in = model, num_epochs = 100, load_model = False, freeze_extractor = False)
+  ```
+  For comparing different encoder network, decoder network and video clips of different length you can check the code in detail and modify the corresponding code.
+  The model with best performance is the ResNet50-LSTM3 model, the trained model path is here: [**link??**]()
+  
+  To infer the model with data without labels, you can put all your images into a dir called "inference_data" as structrue:
+  ```bash
+  inference_data/
+    - clip1
+        -frame00.png
+        -frame01.png
+        - ...
+    - clip2
+        -frame00.png
+        -frame01.png
+        - ...
+    - ... 
+  ```
+  
+  Then you can start inference by comment the traning code and uncomment the inference code:
+  ```python
+  model = CLSTM(lstm_hidden_dim = 512, lstm_num_layers = 3, class_num=8)      
+  infer(model)
+  ```
+  or if your want to run inference with tensorrt (you have to install [**torch2trt**](https://github.com/NVIDIA-AI-IOT/torch2trt) before. Besides, the original torch2trt dosen't have LSTM implementation on TRT, so you have to write the corresponding converter as [**link**](https://github.com/NVIDIA-AI-IOT/torch2trt/issues/144))
+  ```bash
+  python models/CNN_LSTM_model_infer_RT.py
+  ```
+#### YOLO-ResNet-LSTM model:
+  To run YOLO network to detect the light before feeding into ResNet-LSTM:
+  You have to install YOLO as instruction: [**link**](https://github.com/AlexeyAB/darknet)
+  Then you can use the code /YOLO_models/[**??**]() to get the bbox of lights, then either cut out the ROI or feed as masks.
+  The pre-trained model: [**link??**]().
+  And you can create a new dataset folder named "YOLO_mask_dataset" which has the same structure of train/valid/test
+  Then you can start training by run script:
+  ```bash
+  python models/CNN_LSTM_model_mask.py
+  ```
+  However, the result of this model is worse, which means the YOLO network misleads the classifier.
   
 ## Result:
 
@@ -72,79 +160,4 @@ We labeled 715 images with bbox of lights: [**link**](), some examples of each c
 <div align=center> <img src="https://github.com/chrisHuxi/vehicle-signal-lights-states-classification/blob/master/readme/evluation/dataset_detection.png" alt="drawing" width="500"/> </div>
 
 
-## Usage:
-
-### Config enviroment:
-  ```bash
-  python3 -m venv /path/to/your/virtual/env
-  source /path/to/your/virtual/env
-  pip install requirements.txt
-  ```
-
-### Train model:
-The most important code file are the dataloader/VSLdataset.py, models/CNN_LSTM_model_resnet50.py and models/CNN_LSTM_model_infer_RT.py.
-And you have to make sure your dataset structure looks like this:
-```bash
-train/
-    - BOO/
-        -clip1/
-            -frame00.png
-            -frame01.png
-            - ...
-        -clip2
-            - frame00.png
-            - frame01.png
-            - ...
-    - BLO
-        -clip3/
-            -frame00.png
-            -frame01.png
-            - ...
-        -clip4
-            - frame00.png
-            - frame01.png
-    - ... 
-  valid/
-      - BOO/
-      -...
-  test/
-      - BOO/
-      -...   
-  ```
-  
-  Then you can start training by run script:
-  ```bash
-  python models/CNN_LSTM_model_resnet50.py
-  ```
-  where mainly includes 2 step: 1. create model 2. training model
-  ```python
-  model = CLSTM(lstm_hidden_dim = 512, lstm_num_layers = 3, class_num=8)        
-  train(model_in = model, num_epochs = 100, load_model = False, freeze_extractor = False)
-  ```
-  For comparing different encoder network, decoder network and video clips of different length you can check the code in detail and modify the corresponding code.
-  The model with best performance is the ResNet50-LSTM3 model, the trained model path is here: [**link**]()
-  
-  To infer the model with data without labels, you can put all your images into a dir called "inference_data" as structrue:
-  ```bash
-  inference_data/
-    - clip1
-        -frame00.png
-        -frame01.png
-        - ...
-    - clip2
-        -frame00.png
-        -frame01.png
-        - ...
-    - ... 
-  ```
-  
-  Then you can start inference by comment the traning code and uncomment the inference code:
-  ```python
-  model = CLSTM(lstm_hidden_dim = 512, lstm_num_layers = 3, class_num=8)      
-  infer(model)
-  ```
-  or if your want to run inference with tensorrt (you have to install [**torch2trt**](https://github.com/NVIDIA-AI-IOT/torch2trt) before. Besides, the original torch2trt dosen't have LSTM implementation on TRT, so you have to write the corresponding converter as [**link**](https://github.com/NVIDIA-AI-IOT/torch2trt/issues/144))
-  ```bash
-  python models/CNN_LSTM_model_infer_RT.py
-  ```
 
