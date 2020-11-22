@@ -39,6 +39,9 @@ class_name_to_id_ = {
 
 
 
+"""
+    class for generating the frame ids, helper function of class::VSLDataSet
+"""
 # reference: https://discuss.pytorch.org/t/how-upload-sequence-of-image-on-video-classification/24865/9
 class FramesSampler(torch.utils.data.Sampler):
     def __init__(self, end_idx, seq_length):        
@@ -46,7 +49,7 @@ class FramesSampler(torch.utils.data.Sampler):
         for i in range(len(end_idx)-1): 
             start = end_idx[i]
             end = end_idx[i+1] - seq_length
-            indices.append(torch.arange(start, end)) #滑动窗口
+            indices.append(torch.arange(start, end)) 
         indices = torch.cat(indices)
         self.indices = indices
         
@@ -58,17 +61,25 @@ class FramesSampler(torch.utils.data.Sampler):
     def __len__(self):
         return len(self.indices)
 
-
+        
+"""
+    class for Dataset
+    @ param:
+        1. image_paths: r'./dataset/train' (the dir of dataset)
+        
+        2. seq_length: the video clip of training, default as 10
+        
+        3. transform_list: a list of transform for data augmentation: 
+                eg. [albu.Compose([...]), albu.Compose([...])], 
+                first transform is resize to (3, 224, 224) for all the images, second is blur & rgb transform & ...
+                
+        4. imba_transform_dict: a dict of transform for data augmentation, to perform different transform for each class.
+                eg. { 'BOO': albu.Compose([...]), 'OOL': albu.Compose([...]) }, default as None, which means there is no imbalanced class
+                
+        5. length: number of all the video clips
+"""
 class VSLDataSet(Dataset):
     def __init__(self, image_paths, seq_length, transform_list, imba_transform_dict, length):
-        '''
-        constructor of VSLDataLoader
-        @ param:
-            1. image_paths: r'./dataset/train' (the dir of dataset)
-            2. transform: image_transform (for augmentation of image)
-            3. mode: 'train', 'valid' or 'test' (test mode will not return label)
-            4. class_name_to_id: dict convert one of class name to id
-        '''
         self.image_paths = image_paths
         self.seq_length = seq_length
         self.transform_list = transform_list
@@ -81,13 +92,11 @@ class VSLDataSet(Dataset):
     def __getitem__(self, index):
         start = index
         end = index + self.seq_length
-        #print('Getting images from {} to {}'.format(start, end))
         indices = list(range(start, end))
         images = []
         label = self.image_paths[start][1]
         y = torch.tensor(label, dtype=torch.long)
-        if((label in self.imba_ids) and (self.imba_transform_dict != None)): #如果有设置imba，且该example的标签是这个
-            # TODO: finished the imbalanced aug
+        if((label in self.imba_ids) and (self.imba_transform_dict != None)): #if we set imba transform，and current example's label is the key
             for i in indices:
                 image_path = self.image_paths[i][0]
                 image = np.array(Image.open(image_path))
@@ -113,7 +122,7 @@ class VSLDataSet(Dataset):
                 images_.append(self.transform_list[0](img))
             x = torch.stack(images_)
 
-        else: #对于普通的类别
+        else: #for all the data we apply the same transform
             if(self.transform_list[1] == None):
                 images = []
                 for i in indices:
@@ -141,12 +150,6 @@ class VSLDataSet(Dataset):
                                                                         image6=images[7],
                                                                         image7=images[8],
                                                                         image8=images[9])
-                                                                        #image9=images[10],
-                                                                        #image10=images[11],
-                                                                        #image11=images[12],
-                                                                        #image12=images[13],
-                                                                        #image13=images[14],
-                                                                        #image14=images[15])
                 images_after_transform = []
                 for img_name in augmented.keys():
                     img_after_transform = augmented[img_name]
@@ -158,6 +161,21 @@ class VSLDataSet(Dataset):
     def __len__(self):
         return self.length
 
+        
+"""
+    function to generate dataset
+    @ param:
+        1. root_dir: the dir of a dataset(train/test/valid): eg. '~/Thesis/code/dataset/train/'
+        
+        2. class_name_to_id: the class_name and index's table
+        
+        3. aug_transform_list: a list of transform for data augmentation: 
+                eg. [albu.Compose([...]), albu.Compose([...])], 
+                first transform is resize to (3, 224, 224) for all the images, second is blur & rgb transform & ...
+                
+        4. imba_transform_dict: a dict of transform for data augmentation, to perform different transform for each class.
+                eg. { 'BOO': albu.Compose([...]), 'OOL': albu.Compose([...]) }, default as None, which means there is no imbalanced class
+"""
 def load_dataset(root_dir, class_name_to_id, aug_transform_list, imba_transform_dict = None):
 
     class_image_paths = []
@@ -189,6 +207,16 @@ def load_dataset(root_dir, class_name_to_id, aug_transform_list, imba_transform_
 
     return dataset, sampler
 
+    
+"""
+    function to generate dataloader for train/valid/test set, here you can define the transform_list and data_root_dir
+    @ param:
+        1. train_batch_size: the size of number of video clips of one batch
+        
+        2. valid_batch_size: the same for valid set
+        
+        3. valid_batch_size: the same for test set
+"""    
 def create_dataloader_train_valid_test(train_batch_size=32, valid_batch_size=16, test_batch_size=16):
     
     common_transform_tensor = transforms.Compose([
@@ -200,8 +228,6 @@ def create_dataloader_train_valid_test(train_batch_size=32, valid_batch_size=16,
     
 
     train_transform = albu.Compose([
-        #albu.VerticalFlip(p=0.5),
-        #albu.HorizontalFlip(p=0.5), #翻转了就要改标签了，麻烦
         albu.RandomBrightnessContrast(p=0.5),
         albu.Blur(p=0.5),
         albu.HueSaturationValue(p=0.5),
@@ -214,7 +240,6 @@ def create_dataloader_train_valid_test(train_batch_size=32, valid_batch_size=16,
 
     train_dataset, train_sampler = load_dataset(root_dir = '/media/huxi/DATA/inf_master/Semester-5/Thesis/code/dataset/train/', class_name_to_id = class_name_to_id_, aug_transform_list = [common_transform_tensor, train_transform])
     
-
     valid_dataset, valid_sampler = load_dataset(root_dir = '/media/huxi/DATA/inf_master/Semester-5/Thesis/code/dataset/valid/', class_name_to_id = class_name_to_id_, aug_transform_list = [common_transform_tensor, None])
 
     test_dataset, test_sampler = load_dataset(root_dir = '/media/huxi/DATA/inf_master/Semester-5/Thesis/code/dataset/test/', class_name_to_id = class_name_to_id_, aug_transform_list = [common_transform_tensor, None])
@@ -251,44 +276,10 @@ def create_dataloader_train_valid_test(train_batch_size=32, valid_batch_size=16,
     return dataloaders
 
 
-# === todo test: for speeding up ===
-'''
-class DataPrefetcher():
-    def __init__(self, loader, opt):
-        self.loader = iter(loader)
-        self.opt = opt
-        self.stream = torch.cuda.Stream()
-        # With Amp, it isn't necessary to manually convert data to half.
-        # if args.fp16:
-        #     self.mean = self.mean.half()
-        #     self.std = self.std.half()
-        self.preload()
 
-    def preload(self):
-        try:
-            self.batch = next(self.loader)
-        except StopIteration:
-            self.batch = None
-            return
-        with torch.cuda.stream(self.stream):
-            for k in self.batch:
-                if k != 'meta':
-                    self.batch[k] = self.batch[k].to(device=self.opt.device, non_blocking=True)
-
-            # With Amp, it isn't necessary to manually convert data to half.
-            # if args.fp16:
-            #     self.next_input = self.next_input.half()
-            # else:
-            #     self.next_input = self.next_input.float()
-
-    def next(self):
-        torch.cuda.current_stream().wait_stream(self.stream)
-        batch = self.batch
-        self.preload()
-        return batch
-'''
-# =============================
-
+"""
+    a example to use the dataloader
+"""    
 if __name__ == '__main__':
 
     dataloaders = create_dataloader_train_valid_test(train_batch_size=4, valid_batch_size=1, test_batch_size=1)

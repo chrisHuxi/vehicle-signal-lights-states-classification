@@ -19,16 +19,18 @@ import os
 # for marco-F1 and micro-F1
 from sklearn.metrics import f1_score
 
+
 class_name_to_id_ = {
 'OOO':0,
 'BOO':1,
 'OLO':2,
-'OOR':3,
-'BLO':4,
+'BLO':3,
+'OOR':4,
 'BOR':5,
 'OLR':6,
 'BLR':7
 }
+
 
 # https://scikit-learn.org/stable/auto_examples/model_selection/plot_roc.html
 def draw_roc_bin(y_label, y_predicted):

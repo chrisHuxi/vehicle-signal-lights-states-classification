@@ -19,7 +19,7 @@ sys.path.append('../')
 
 import os
 import dataloader.VSLdataset as VSLdataset
-#import dataloader.VSLdataset_yoloraw as VSLdataset
+
 import torch.optim as optim
     
 import matplotlib.pyplot as plt
@@ -93,13 +93,6 @@ class CLSTM(resnet3d.I3Res50):
         #print(logit.shape)
         return logit    
   
-# 测试一下输出的size        
-def test_model():
-    model = CLSTM(lstm_hidden_dim = 10, lstm_num_layers = 2, class_num=8)
-    #batch, len, channel, width, height
-    data = torch.randn(1, 10, 3, 224, 224)
-    output = model(data)
-    print(output,shape)
 
 def load_checkpoint(model, checkpoint_PATH):
     if checkpoint_PATH != None:
@@ -224,8 +217,7 @@ def train(model_in, num_epochs = 3, load_model = True, freeze_extractor = True):
             writer.add_scalar('Valid/Loss ', loss_eval/len(valid_dataloader), epoch)
             writer.flush()
             loss_eval = 0.0
-
-            # 每次 eval 都进行保存
+            
             # save current model
             torch.save({
                 'model_state_dict': model.state_dict(),

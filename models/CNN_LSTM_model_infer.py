@@ -27,7 +27,6 @@ class CLSTM(models.resnet.ResNet):
     def __init__(self, lstm_hidden_dim, lstm_num_layers, class_num, pretrained=True):
         super().__init__(models.resnet.Bottleneck, [3, 4, 6, 3]) # 50
         #super().__init__(models.resnet.Bottleneck, [3, 4, 23, 3]) # 101
-        
         #super().__init__(models.resnet.BasicBlock, [2, 2, 2, 2]) # 18
 
         self.hidden_dim = lstm_hidden_dim
@@ -103,7 +102,6 @@ def load_checkpoint(model, checkpoint_PATH):
     return model   
 
 def infer(model_in):
-
     # === got model ===
     save_file = os.path.join('../saved_model', 'CLSTM_50_l10_h512_loss021_best.pth')
     model = load_checkpoint(model_in, save_file)

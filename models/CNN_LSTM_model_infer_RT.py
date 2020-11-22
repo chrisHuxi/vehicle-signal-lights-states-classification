@@ -31,10 +31,14 @@ import tensorrt as trt
 from torch2trt import TRTModule
 import time
 
-# logger to capture errors, warnings, and other information during the build and inference phases
 
+"""
+    Neural Network: ResNet50_LSTM
+    Detail: infer with original normal model and trt model
+    
+"""
 # https://discuss.pytorch.org/t/solved-concatenate-time-distributed-cnn-with-lstm/15435/4
-# https://blog.csdn.net/shanglianlm/article/details/86376627 resnet 用法
+# https://blog.csdn.net/shanglianlm/article/details/86376627 resnet usage
 class CLSTM(models.resnet.ResNet):
     def __init__(self, lstm_hidden_dim, lstm_num_layers, class_num, pretrained=True):
         super().__init__(models.resnet.Bottleneck, [3, 4, 6, 3]) # 50
@@ -59,7 +63,7 @@ class CLSTM(models.resnet.ResNet):
         # linear
         self.hidden1_fc = nn.Linear(self.hidden_dim, self.hidden_dim // 2)
         self.hidden2_fc = nn.Linear(self.hidden_dim // 2, self.class_num)
-        # dropout
+
 
     def forward(self, x):
         # size: batch, len, channel, width, height
@@ -94,7 +98,13 @@ class CLSTM(models.resnet.ResNet):
         #print(logit.shape)
         return logit       
 
-
+"""
+    function to load the saved model
+    @ param:
+        1. model: the model object (must have the same architecture with the saved model)
+        
+        2. checkpoint_PATH: path of the saved model (eg. '../saved_model/CLSTM_50_l10_h512_d02.pth')
+"""   
 def load_checkpoint(model, checkpoint_PATH):
     if checkpoint_PATH != None:
         model_CKPT = torch.load(checkpoint_PATH)
@@ -103,6 +113,17 @@ def load_checkpoint(model, checkpoint_PATH):
     return model   
 
 
+"""
+    function to save the pytorch model into trt model
+    @ param:
+        1. model_in: the model object (must have the same architecture with the saved model)
+        
+        2. file_name: saved model name (eg. test_trt_fp32.pth)
+        
+        3. fp16: enable FP16 mode, which is not supported by gtx1060
+        
+        4. int8: enable INT8 mode, which is not clear how to use sofar
+"""   
 def save_model_trt(model_in, file_name, fp16 = False, int8 = False):
     # === got model ===
     save_file = os.path.join('../saved_model', 'CLSTM_50_l10_h512_loss021_best.pth')
@@ -124,6 +145,11 @@ def save_model_trt(model_in, file_name, fp16 = False, int8 = False):
     model_trt = torch2trt(model, [data_example], max_workspace_size=1<<26, fp16_mode = fp16, int8_mode = int8)
     torch.save(model_trt.state_dict(), file_name)
 
+"""
+    function to infer with the pytorch model
+    @ param:
+        1. model_in: the model object (must have the same architecture with the saved model)
+"""  
 def infer_normal(model_in):
 
     # === got model ===
@@ -142,8 +168,6 @@ def infer_normal(model_in):
     data_example = torch.ones((1, 10, 3, 224, 224))
     data_example = data_example.to(device)
 
-    #model_trt = torch2trt(model, [data_example], max_workspace_size=1<<26)
-    #torch.save(model_trt.state_dict(), 'test_trt.pth')
 
     for folder_name in os.listdir('/media/huxi/DATA/inf_master/Semester-5/Thesis/code/dataset/inference_data'):
         print(folder_name)
@@ -189,7 +213,17 @@ def infer_normal(model_in):
 
 
 
-
+"""
+    function to load and infer with trt model
+    @ param:
+        1. model_in: the model object (must have the same architecture with the saved model)
+        
+        2. file_name: saved model name (eg. test_trt_fp32.pth)
+        
+        3. fp16: enable FP16 mode, which is not supported by gtx1060
+        
+        4. int8: enable INT8 mode, which is not clear how to use sofar
+""" 
 def load_trt_model_and_infer(model_in, file_name, fp16 = False, int8 = False):
 
     save_file = os.path.join('../saved_model', file_name)
@@ -214,7 +248,7 @@ def load_trt_model_and_infer(model_in, file_name, fp16 = False, int8 = False):
         infer_dataloader = dataloaders['infer']
         # =============================
         print_list = []
-        file_name = track_folder_name + '.txt'
+        result_file_name = track_folder_name + '.txt'
         mean_runtime = 0
         print('Infer:')
 
@@ -246,7 +280,11 @@ def load_trt_model_and_infer(model_in, file_name, fp16 = False, int8 = False):
     print('test')
 
 
-
+"""
+    function to test a original resnet50's gpu memory cost
+    @ param:
+        None
+""" 
 def resnet_test():
 
     # === got model ===
@@ -266,7 +304,9 @@ def resnet_test():
         print(output_eval)
 
 
-
+"""
+    a example to construct the model and infer with it by trt
+"""   
 if __name__=='__main__':
 
     model = CLSTM(lstm_hidden_dim = 512, lstm_num_layers = 3, class_num=8) 

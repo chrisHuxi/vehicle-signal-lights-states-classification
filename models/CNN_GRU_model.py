@@ -27,7 +27,7 @@ from torch.utils.tensorboard import SummaryWriter
 import evaluate
 
 """
-    Neural Network: CNN_LSTM
+    Neural Network: CNN_GRU
     Detail: the input crosss cnn model and LSTM model independly, then the result of both concat
 """
 # https://discuss.pytorch.org/t/solved-concatenate-time-distributed-cnn-with-lstm/15435/4
