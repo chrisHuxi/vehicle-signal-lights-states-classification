@@ -15,25 +15,25 @@ This thesis aims to solve the state classification problem of daytime vehicle si
  The ResNet-LSTM got a impressive result, the architecture is shown:
  
  
- <div align=center> <img src="https://github.com/chrisHuxi/vehicle-signal-lights-states-classification/blob/master/readme/evluation/proposed_model/ResNet-LSTM.png" alt="drawing" width="500"/>
+ <div align=center> <img src="https://github.com/chrisHuxi/vehicle-signal-lights-states-classification/blob/master/readme/evluation/proposed_model/ResNet-LSTM.png" alt="drawing" width="500"/> </div>
 
 
  ### YOLO-ResNet-LSTM network
  The YOLO-ResNet-LSTM however got a worse result, the architecture is shown:
  
  
- <div align=center> <img src="https://github.com/chrisHuxi/vehicle-signal-lights-states-classification/blob/master/readme/evluation/proposed_model/YOLO-ResNet-LSTM.png" alt="drawing" width="500"/>
+ <div align=center> <img src="https://github.com/chrisHuxi/vehicle-signal-lights-states-classification/blob/master/readme/evluation/proposed_model/YOLO-ResNet-LSTM.png" alt="drawing" width="500"/> </div>
   
   
 ## Result:
 
 ### Statics:
 
-<div align=center> <img src="https://github.com/chrisHuxi/vehicle-signal-lights-states-classification/blob/master/readme/table.PNG" alt="drawing" width="700"/>
+<div align=center> <img src="https://github.com/chrisHuxi/vehicle-signal-lights-states-classification/blob/master/readme/table.PNG" alt="drawing" width="700"/> </div>
 
 We choose a model with best performance: ResNet50-LSTM3 and find that when a longer sequence is applied only for the test phase while in the training phase the short sequence is applied, the classification result could be even better.
 
-<div align=center> <img src="https://github.com/chrisHuxi/vehicle-signal-lights-states-classification/blob/master/readme/table_long.PNG" alt="drawing" width="700"/>
+<div align=center> <img src="https://github.com/chrisHuxi/vehicle-signal-lights-states-classification/blob/master/readme/table_long.PNG" alt="drawing" width="700"/> </div>
 
 
 ### Visualized result:
