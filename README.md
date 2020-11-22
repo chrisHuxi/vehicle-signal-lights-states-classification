@@ -14,11 +14,16 @@ This thesis aims to solve the state classification problem of daytime vehicle si
  ### ResNet-LSTM network
  The ResNet-LSTM got a impressive result, the architecture is shown:
  
+ 
  <div align=center> <img src="https://github.com/chrisHuxi/vehicle-signal-lights-states-classification/blob/master/readme/evluation/proposed_model/ResNet-LSTM.png" alt="drawing" width="500"/>
+
 
  ### YOLO-ResNet-LSTM network
  The YOLO-ResNet-LSTM however got a worse result, the architecture is shown:
+ 
+ 
  <div align=center> <img src="https://github.com/chrisHuxi/vehicle-signal-lights-states-classification/blob/master/readme/evluation/proposed_model/YOLO-ResNet-LSTM.png" alt="drawing" width="500"/>
+  
   
 ## Result:
 
