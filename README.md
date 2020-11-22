@@ -15,10 +15,9 @@ To train a neural network, a significant role is the dataset. For vehicle signal
 ### The end-to-end method dataset
 We used a public dataset: [**link**](), some examples of each class is shown:
 
-<div align=center> <img src="https://github.com/chrisHuxi/vehicle-signal-lights-states-classification/blob/master/readme/evluation/dataset.png> </div>
+<img src="https://github.com/chrisHuxi/vehicle-signal-lights-states-classification/blob/master/readme/evluation/dataset.png" alt="drawing" width="500"/>
 
 ### The detection-based method dataset
 We labeled 715 images with bbox of lights, some examples of each class is shown:
 
-
-<div align=center> <img src="https://github.com/chrisHuxi/vehicle-signal-lights-states-classification/blob/master/readme/evluation/dataset_detection.png> </div>
+<img src="https://github.com/chrisHuxi/vehicle-signal-lights-states-classification/blob/master/readme/evluation/dataset_detection.png" alt="drawing" width="500"/>
