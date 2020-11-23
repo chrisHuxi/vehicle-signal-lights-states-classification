@@ -76,7 +76,7 @@ train/
   train(model_in = model, num_epochs = 100, load_model = False, freeze_extractor = False)
   ```
   For comparing different encoder network, decoder network and video clips of different length you can check the code in detail and modify the corresponding code.
-  The model with best performance is the ResNet50-LSTM3 model, the trained model path is here: [**link??**]()
+  The model with best performance is the ResNet50-LSTM3 model, the trained model path is here: [**link??**](https://drive.google.com/file/d/1-cCerVeUZiSA8JMzGZzu_NBH0JjbSEkY/view?usp=sharing)
   
   To infer the model with data without labels, you can put all your images into a dir called "inference_data" as structrue:
   ```bash
@@ -105,7 +105,7 @@ train/
   To run YOLO network to detect the light before feeding into ResNet-LSTM:
   You have to install YOLO as instruction: [**link**](https://github.com/AlexeyAB/darknet)
   Then you can use the code /YOLO_models/[**??**]() to get the bbox of lights, then either cut out the ROI or feed as masks.
-  The pre-trained model: [**link??**]().
+  The pre-trained YOLOv4 model: [**link??**](https://drive.google.com/file/d/1JS4Rb6KH5lNw99zjb1WHZpZse6Z15ryZ/view?usp=sharing).
   And you can create a new dataset folder named "YOLO_mask_dataset" which has the same structure of train/valid/test
   Then you can start training by run script:
   ```bash
@@ -154,7 +154,7 @@ We used a public dataset: [**link**](https://drive.google.com/file/d/1T4nUM7Vx3s
 
 
 ### The detection-based method dataset
-We labeled 715 images with bbox of lights: [**link**](), some examples of each class is shown:
+We labeled 715 images with bbox of lights: [**link**](https://drive.google.com/file/d/1rAa-32NHZ27UNN56t_qAO3GS65-7jWoF/view?usp=sharing), some examples of each class is shown:
 
 
 <div align=center> <img src="https://github.com/chrisHuxi/vehicle-signal-lights-states-classification/blob/master/readme/evluation/dataset_detection.png" alt="drawing" width="500"/> </div>
